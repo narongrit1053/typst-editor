@@ -297,7 +297,7 @@ pub fn download_and_launch_installer(url: String) -> Result<(), String> {
         return Err("UNTRUSTED_DOWNLOAD_URL".to_string());
     }
     let temp_dir = std::env::temp_dir();
-    let installer_path = temp_dir.join("typst-editor-setup.exe");
+    let installer_path = temp_dir.join(format!("typst-editor-setup-{}.exe", std::process::id()));
 
     let resp = ureq::get(&url)
         .timeout(std::time::Duration::from_secs(60))

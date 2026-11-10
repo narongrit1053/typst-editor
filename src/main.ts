@@ -582,6 +582,10 @@ export async function openFolder(folderPath?: string) {
     } catch {}
     lspConnection = null;
   }
+  if (editor) {
+    editor.destroy();
+    editor = null;
+  }
 
   lastRestartTime = 0;
   try {
@@ -810,7 +814,13 @@ async function handleExternalFileChange() {
         scheduleOutlineRefresh();
       }
     }
-  } catch {}
+  } catch (err: any) {
+    const msg = String(err?.message || err);
+    if (msg.includes("not found") || msg.includes("No such file") || msg.includes("os error 2") || msg.includes("CANONICALIZE_FAIL")) {
+      const fileName = currentFilePath.split(/[\\/]/).pop() || currentFilePath;
+      showBanner(`The file "${fileName}" was removed from disk.`, true);
+    }
+  }
 }
 
 function initApp() {

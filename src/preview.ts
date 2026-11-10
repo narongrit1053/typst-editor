@@ -33,18 +33,37 @@ export function resetZoom(frame: HTMLIFrameElement): number {
   return setZoom(frame, 1.0);
 }
 
+export function handlePreviewMessage(data: any, onJumpToSource?: (file: string, line: number, col: number) => void): boolean {
+  if (!data || typeof data !== "object") return false;
+  if (data.type === "jumpTo" || data.event === "editorScrollTo") {
+    const rawFile = data.filepath || data.path || "";
+    const file = rawFile.startsWith("file://") ? uriToPath(rawFile) : rawFile;
+    const line = typeof data.line === "number" ? data.line + 1 : 1;
+    const col = typeof data.character === "number" ? data.character + 1 : (typeof data.col === "number" ? data.col + 1 : 1);
+    onJumpToSource?.(file, line, col);
+    return true;
+  }
+  return false;
+}
+
 export function initPreviewSync(onJumpToSource?: (file: string, line: number, col: number) => void): void {
+  if (typeof window === "undefined") return;
   window.addEventListener("message", (event) => {
-    const data = event.data;
-    if (!data || typeof data !== "object") return;
-    if (data.type === "jumpTo" || data.event === "editorScrollTo") {
-      const rawFile = data.filepath || data.path || "";
-      const file = rawFile.startsWith("file://") ? uriToPath(rawFile) : rawFile;
-      const line = typeof data.line === "number" ? data.line + 1 : 1;
-      const col = typeof data.character === "number" ? data.character + 1 : (typeof data.col === "number" ? data.col + 1 : 1);
-      onJumpToSource?.(file, line, col);
-    }
+    handlePreviewMessage(event.data, onJumpToSource);
   });
+}
+
+export async function waitForPort(url: string, maxAttempts = 15, delayMs = 100): Promise<boolean> {
+  if (typeof window === "undefined") return true;
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      await fetch(url, { method: "HEAD", mode: "no-cors" });
+      return true;
+    } catch {
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+  return false;
 }
 
 export async function stopPreview(lsp?: LspConnection): Promise<void> {
@@ -72,15 +91,35 @@ export async function startPreview(
   activeLsp = lsp;
 
   try {
-    const res = (await lsp.request("workspace/executeCommand", {
-      command: "tinymist.doStartPreview",
-      arguments: [["--no-open", mainPath]],
-    })) as PreviewStartResult | undefined;
+    let res: PreviewStartResult | undefined;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      try {
+        res = (await lsp.request("workspace/executeCommand", {
+          command: "tinymist.doStartPreview",
+          arguments: [["--no-open", "--data-plane-host", "127.0.0.1:0", mainPath]],
+        })) as PreviewStartResult | undefined;
+        break;
+      } catch (err: any) {
+        if (err?.code === -32002 && attempt < 9) {
+          await new Promise((r) => setTimeout(r, 150));
+          continue;
+        }
+        throw err;
+      }
+    }
 
     isPreviewRunning = true;
     const port = res?.staticServerPort || 23625;
     const previewUrl = `http://127.0.0.1:${port}/`;
-    if (frame.src !== previewUrl) {
+    await waitForPort(previewUrl);
+
+    if (frame.src === previewUrl) {
+      try {
+        frame.contentWindow?.location.reload();
+      } catch {
+        frame.src = previewUrl;
+      }
+    } else {
       frame.src = previewUrl;
     }
     // Apply current zoom
