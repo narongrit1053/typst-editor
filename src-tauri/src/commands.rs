@@ -19,13 +19,18 @@ pub struct FileEntry {
 
 pub fn resolve_inside(root: &Path, candidate: &Path) -> Result<PathBuf, String> {
     let root_canon = fs::canonicalize(root).map_err(|e| format!("NO_ROOT: {}", e))?;
-
-    let can_canon = if candidate.exists() {
-        fs::canonicalize(candidate).map_err(|e| e.to_string())?
+    let full_cand = if candidate.is_absolute() {
+        candidate.to_path_buf()
     } else {
-        let parent = candidate.parent().ok_or_else(|| "OUTSIDE_ROOT".to_string())?;
+        root.join(candidate)
+    };
+
+    let can_canon = if full_cand.exists() {
+        fs::canonicalize(&full_cand).map_err(|e| e.to_string())?
+    } else {
+        let parent = full_cand.parent().ok_or_else(|| "OUTSIDE_ROOT".to_string())?;
         let parent_canon = fs::canonicalize(parent).map_err(|_| "OUTSIDE_ROOT".to_string())?;
-        let file_name = candidate.file_name().ok_or_else(|| "OUTSIDE_ROOT".to_string())?;
+        let file_name = full_cand.file_name().ok_or_else(|| "OUTSIDE_ROOT".to_string())?;
         parent_canon.join(file_name)
     };
 
@@ -463,7 +468,20 @@ pub fn export_file(
     let root = root_guard.as_ref().ok_or_else(|| "NO_ROOT".to_string())?;
 
     let main_path = resolve_inside(root, Path::new(&main))?;
-    let out_path = PathBuf::from(&out);
+    let mut out_path = PathBuf::from(&out);
+
+    // If exporting to image (PNG/SVG) and path lacks page template ({p} or {0p}),
+    // automatically append _{0p} before extension so multi-page documents compile without error.
+    let out_str = out_path.to_string_lossy().to_string();
+    let lower_out = out_str.to_lowercase();
+    let is_img = lower_out.ends_with(".png") || lower_out.ends_with(".svg");
+    let has_template = out_str.contains("{p}") || out_str.contains("{0p}");
+    if is_img && !has_template {
+        if let Some(stem) = out_path.file_stem().and_then(|s| s.to_str()) {
+            let ext = out_path.extension().and_then(|s| s.to_str()).unwrap_or("");
+            out_path.set_file_name(format!("{}_{{0p}}.{}", stem, ext));
+        }
+    }
 
     let font_candidate = root.join("fonts");
     let font_dir = if font_candidate.is_dir() {
@@ -490,11 +508,31 @@ pub fn export_file(
     })?;
 
     if !output.status.success() {
-        let err_msg = String::from_utf8_lossy(&output.stderr).to_string();
-        return Err(if err_msg.trim().is_empty() {
+        let stderr_raw = String::from_utf8_lossy(&output.stderr).to_string();
+        let mut err_lines: Vec<&str> = stderr_raw
+            .lines()
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .filter(|s| s.starts_with("error:") || s.contains("error"))
+            .collect();
+
+        let clean_err = if !err_lines.is_empty() {
+            err_lines.truncate(3);
+            err_lines.join("\n")
+        } else {
+            stderr_raw
+                .lines()
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .take(3)
+                .collect::<Vec<&str>>()
+                .join("\n")
+        };
+
+        return Err(if clean_err.trim().is_empty() {
             format!("typst compile failed with status {}", output.status)
         } else {
-            err_msg
+            clean_err
         });
     }
 
@@ -524,8 +562,25 @@ mod tests {
 
         assert!(resolve_inside(&proj, &proj.join("sub/a.typ")).is_ok());
         assert!(resolve_inside(&proj, &proj.join("new.typ")).is_ok());
+        assert!(resolve_inside(&proj, Path::new("sub/a.typ")).is_ok());
+        assert!(resolve_inside(&proj, Path::new("new.typ")).is_ok());
         assert_eq!(resolve_inside(&proj, &proj.join("../proj2/b.typ")), Err("OUTSIDE_ROOT".into()));
         assert_eq!(resolve_inside(&proj, &proj2.join("b.typ")), Err("OUTSIDE_ROOT".into()));
+    }
+
+    #[test]
+    fn test_image_export_path_template() {
+        let mut out = PathBuf::from("paper.png");
+        let out_str = out.to_string_lossy().to_string();
+        let lower = out_str.to_lowercase();
+        let is_img = lower.ends_with(".png") || lower.ends_with(".svg");
+        let has_template = out_str.contains("{p}") || out_str.contains("{0p}");
+        if is_img && !has_template {
+            let stem = out.file_stem().unwrap().to_str().unwrap();
+            let ext = out.extension().unwrap().to_str().unwrap();
+            out.set_file_name(format!("{}_{{0p}}.{}", stem, ext));
+        }
+        assert_eq!(out.to_string_lossy(), "paper_{0p}.png");
     }
 
     #[test]

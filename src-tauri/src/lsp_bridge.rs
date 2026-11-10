@@ -36,6 +36,10 @@ pub fn tinymist_path(app: Option<&AppHandle>) -> PathBuf {
             if res_cand.exists() {
                 return res_cand;
             }
+            let res_tools = res_dir.join("tools").join("tinymist.exe");
+            if res_tools.exists() {
+                return res_tools;
+            }
         }
     }
     if let Ok(exe) = std::env::current_exe() {
@@ -48,11 +52,27 @@ pub fn tinymist_path(app: Option<&AppHandle>) -> PathBuf {
             if sub.exists() {
                 return sub;
             }
+            let sub_tools = dir.join("resources").join("tools").join("tinymist.exe");
+            if sub_tools.exists() {
+                return sub_tools;
+            }
+            let dev_cand = dir.join("../../tools/tinymist.exe");
+            if dev_cand.exists() {
+                return dev_cand;
+            }
+            let dev_cand3 = dir.join("../../../tools/tinymist.exe");
+            if dev_cand3.exists() {
+                return dev_cand3;
+            }
         }
     }
     let local_tools = PathBuf::from("tools/tinymist.exe");
     if local_tools.exists() {
         return local_tools;
+    }
+    let parent_tools = PathBuf::from("../tools/tinymist.exe");
+    if parent_tools.exists() {
+        return parent_tools;
     }
     PathBuf::from("tinymist")
 }

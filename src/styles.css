@@ -157,12 +157,48 @@ html, body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 8px 16px;
+  padding: 6px 14px;
   background: var(--warn-soft);
   color: var(--warn);
   border-bottom: 1px solid var(--warn);
   font-weight: 500;
   font-size: 13px;
+  max-height: 80px;
+  flex-shrink: 0;
+  z-index: 50;
+}
+
+#banner-text {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 64px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.btn-banner-close {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  opacity: 0.8;
+  line-height: 1;
+}
+
+.btn-banner-close:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .banner.hidden {

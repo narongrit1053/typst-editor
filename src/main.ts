@@ -455,6 +455,20 @@ async function handleLspExit() {
   }
 }
 
+export function extractDialogPath(result: unknown): string | null {
+  if (!result) return null;
+  if (typeof result === "string") return result;
+  if (Array.isArray(result) && result.length > 0) {
+    const first = result[0];
+    if (typeof first === "string") return first;
+    if (typeof first === "object" && first && "path" in first) return (first as any).path;
+  }
+  if (typeof result === "object" && result && "path" in result) {
+    return (result as any).path;
+  }
+  return null;
+}
+
 export async function exportDocument(format: "pdf" | "png" | "svg" = "pdf") {
   const targetExport = pinnedFilePath || currentFilePath;
   if (!targetExport) {
@@ -472,14 +486,17 @@ export async function exportDocument(format: "pdf" | "png" | "svg" = "pdf") {
   }
 
   const defaultExt = format;
-  const defaultPath = targetExport.replace(/\.[^/\\.]+$/, "") + `.${defaultExt}`;
+  const isImage = format === "png" || format === "svg";
+  const baseNoExt = targetExport.replace(/\.[^/\\.]+$/, "");
+  const defaultPath = isImage ? `${baseNoExt}_{0p}.${defaultExt}` : `${baseNoExt}.${defaultExt}`;
   const filterName = format === "pdf" ? "PDF Document" : format === "png" ? "PNG Image" : "SVG Image";
-  const outPath = await saveDialog({
+  const selectedOut = await saveDialog({
     defaultPath,
     filters: [{ name: filterName, extensions: [defaultExt] }],
   });
 
-  if (!outPath || typeof outPath !== "string") return;
+  const outPath = extractDialogPath(selectedOut);
+  if (!outPath) return;
 
   const statusState = document.getElementById("status-state");
   const settings = getCachedSettings();
@@ -517,12 +534,17 @@ export async function exportPdf() {
 export async function openFolder(folderPath?: string) {
   let targetFolder = folderPath;
   if (!targetFolder) {
-    const selected = await openDialog({
-      directory: true,
-      multiple: false,
-    });
-    if (!selected || typeof selected !== "string") return;
-    targetFolder = selected;
+    try {
+      const selected = await openDialog({
+        directory: true,
+        multiple: false,
+      });
+      targetFolder = extractDialogPath(selected) || undefined;
+      if (!targetFolder) return;
+    } catch (e: any) {
+      showBanner(`Could not open folder dialog: ${e?.message || e}`);
+      return;
+    }
   }
 
   if (saver && saver.isDirty()) {
@@ -533,16 +555,28 @@ export async function openFolder(folderPath?: string) {
 
   currentProjectFolder = targetFolder;
   await stopPreview();
-  await invoke("set_root", { path: targetFolder });
+  try {
+    await invoke("set_root", { path: targetFolder });
+  } catch (err: any) {
+    showBanner(`Failed to set folder root: ${err?.message || err}`);
+    return;
+  }
 
   if (lspConnection) {
-    lspConnection.close();
+    try {
+      lspConnection.close();
+    } catch {}
+    lspConnection = null;
   }
 
   lastRestartTime = 0;
-  lspConnection = await connectLsp(targetFolder, () => {
-    handleLspExit();
-  });
+  try {
+    lspConnection = await connectLsp(targetFolder, () => {
+      handleLspExit();
+    });
+  } catch (e) {
+    console.warn("LSP connection error:", e);
+  }
 
   // Restore main pin if configured
   const settings = getCachedSettings();
@@ -566,18 +600,43 @@ export async function openFolder(folderPath?: string) {
 
   if (fileToOpen) {
     await openFile(fileToOpen);
+  } else {
+    currentFilePath = null;
+    updateFileNameDisplay(null, false);
+    const editorEl = document.getElementById("editor");
+    if (editorEl) {
+      const folderName = targetFolder.split(/[\\/]/).pop() || targetFolder;
+      editorEl.innerHTML = `
+        <div class="editor-welcome">
+          <h2 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 600;">Folder Opened</h2>
+          <p style="color: var(--muted); margin: 0 0 16px 0; font-size: 13.5px;">${folderName}</p>
+          <p style="color: var(--muted); margin: 0 0 20px 0; font-size: 13px;">No .typ file selected. Choose a file from the sidebar or create a new file.</p>
+          <div style="display: flex; gap: 10px; justify-content: center;">
+            <button id="folder-new-file-btn" class="btn btn-primary">+ New Typst File</button>
+          </div>
+        </div>
+      `;
+      document.getElementById("folder-new-file-btn")?.addEventListener("click", () => {
+        createNewFile().catch(console.error);
+      });
+    }
   }
 }
 
 export async function openFile(filePath?: string) {
   let targetPath = filePath;
   if (!targetPath) {
-    const selected = await openDialog({
-      filters: [{ name: "Typst Files", extensions: ["typ"] }],
-      multiple: false,
-    });
-    if (!selected || typeof selected !== "string") return;
-    targetPath = selected;
+    try {
+      const selected = await openDialog({
+        filters: [{ name: "Typst Files", extensions: ["typ"] }],
+        multiple: false,
+      });
+      targetPath = extractDialogPath(selected) || undefined;
+      if (!targetPath) return;
+    } catch (e: any) {
+      showBanner(`Could not open file dialog: ${e?.message || e}`);
+      return;
+    }
   }
 
   if (saver && saver.isDirty()) {
@@ -591,20 +650,31 @@ export async function openFile(filePath?: string) {
   if (!currentProjectFolder) {
     currentProjectFolder = folder;
     await stopPreview();
-    await invoke("set_root", { path: folder });
+    try {
+      await invoke("set_root", { path: folder });
+    } catch (e) {
+      console.warn("Failed to set root:", e);
+    }
 
     if (lspConnection) {
-      lspConnection.close();
+      try {
+        lspConnection.close();
+      } catch {}
+      lspConnection = null;
     }
 
     lastRestartTime = 0;
-    lspConnection = await connectLsp(folder, () => {
-      handleLspExit();
-    });
+    try {
+      lspConnection = await connectLsp(folder, () => {
+        handleLspExit();
+      });
+    } catch (e) {
+      console.warn("Failed to connect LSP:", e);
+    }
   }
 
   const editorEl = document.getElementById("editor")!;
-  if (!editor && lspConnection) {
+  if (!editor) {
     editor = createEditor(editorEl, lspConnection);
     const statusPos = document.getElementById("status-pos");
     editor.onCursor((line, col) => {
@@ -627,53 +697,57 @@ export async function openFile(filePath?: string) {
     });
   }
 
-  const content = await invoke<string>("read_file", { path: targetPath });
-  currentFilePath = targetPath;
-  currentEol = detectEol(content);
+  try {
+    const content = await invoke<string>("read_file", { path: targetPath });
+    currentFilePath = targetPath;
+    currentEol = detectEol(content);
 
-  const settings = getCachedSettings();
+    const settings = getCachedSettings();
 
-  saver = createSaver({
-    getText: () => editor?.getText() || "",
-    write: async (text) => {
-      if (!currentFilePath) return;
-      const normalized = withEol(text, currentEol);
-      await invoke("write_file", { path: currentFilePath, contents: normalized });
-    },
-    onState: (state, err) => {
-      if (state === "saved") {
-        hideBanner();
-        updateFileNameDisplay(currentFilePath, false);
-      } else if (state === "dirty" || state === "saving") {
-        updateFileNameDisplay(currentFilePath, true);
-      } else if (state === "error") {
-        updateFileNameDisplay(currentFilePath, true);
-        showBanner(`Save failed: ${err || "Unknown error"}`);
-      }
-    },
-    delayMs: settings.autosave ? 1000 : 999999999,
-  });
-
-  editor?.onChange(() => {
-    if (settings.autosave) {
-      saver?.touch();
-    }
-    scheduleOutlineRefresh();
-  });
-
-  editor?.open(targetPath, content);
-  updateFileNameDisplay(targetPath, false);
-
-  const previewFrame = document.getElementById("preview") as HTMLIFrameElement;
-  const targetPreview = pinnedFilePath || targetPath;
-  if (previewFrame && lspConnection) {
-    startPreview(previewFrame, lspConnection, targetPreview).catch((err) => {
-      console.error("Preview start failed:", err);
+    saver = createSaver({
+      getText: () => editor?.getText() || "",
+      write: async (text) => {
+        if (!currentFilePath) return;
+        const normalized = withEol(text, currentEol);
+        await invoke("write_file", { path: currentFilePath, contents: normalized });
+      },
+      onState: (state, err) => {
+        if (state === "saved") {
+          hideBanner();
+          updateFileNameDisplay(currentFilePath, false);
+        } else if (state === "dirty" || state === "saving") {
+          updateFileNameDisplay(currentFilePath, true);
+        } else if (state === "error") {
+          updateFileNameDisplay(currentFilePath, true);
+          showBanner(`Save failed: ${err || "Unknown error"}`);
+        }
+      },
+      delayMs: settings.autosave ? 1000 : 999999999,
     });
-  }
 
-  await refreshFileTree();
-  scheduleOutlineRefresh();
+    editor?.onChange(() => {
+      if (settings.autosave) {
+        saver?.touch();
+      }
+      scheduleOutlineRefresh();
+    });
+
+    editor?.open(targetPath, content);
+    updateFileNameDisplay(targetPath, false);
+
+    const previewFrame = document.getElementById("preview") as HTMLIFrameElement;
+    const targetPreview = pinnedFilePath || targetPath;
+    if (previewFrame && lspConnection) {
+      startPreview(previewFrame, lspConnection, targetPreview).catch((err) => {
+        console.error("Preview start failed:", err);
+      });
+    }
+
+    await refreshFileTree();
+    scheduleOutlineRefresh();
+  } catch (err: any) {
+    showBanner(`Failed to open file "${targetPath}": ${err?.message || err}`);
+  }
 }
 
 async function handleExternalFileChange() {
@@ -706,6 +780,11 @@ function initApp() {
 
   initSplitter();
   initSettingsModal();
+
+  const bannerClose = document.getElementById("banner-close");
+  bannerClose?.addEventListener("click", () => {
+    hideBanner();
+  });
 
   // Template market initialization
   initTemplateMarket(async (targetDir) => {
@@ -973,8 +1052,10 @@ function initApp() {
 }
 
 // Ensure initApp runs regardless of whether document is already parsed or loading
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initApp);
-} else {
-  initApp();
+if (typeof document !== "undefined") {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initApp);
+  } else {
+    initApp();
+  }
 }

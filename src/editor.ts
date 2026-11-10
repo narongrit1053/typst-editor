@@ -46,37 +46,40 @@ export interface EditorHandle {
   destroy(): void;
 }
 
-export function createEditor(parent: HTMLElement, lsp: LspConnection): EditorHandle {
-  const lspClient = new LSPClient({
-    rootUri: pathToUri(lsp.rootPath),
-    extensions: languageServerExtensions(),
-  }).connect(lsp.transport);
-
+export function createEditor(parent: HTMLElement, lsp: LspConnection | null): EditorHandle {
+  let lspClient: any = null;
   let view: EditorView | null = null;
   const changeCallbacks: (() => void)[] = [];
   const cursorCallbacks: ((line: number, col: number) => void)[] = [];
   const diagnosticsCallbacks: ((d: Problem[]) => void)[] = [];
 
-  lsp.onNotification("textDocument/publishDiagnostics", (params: any) => {
-    if (!params || !params.uri) return;
-    const filePath = uriToPath(params.uri);
-    const problems: Problem[] = (params.diagnostics || []).map((d: any) => {
-      const line = (d.range?.start?.line ?? 0) + 1;
-      const col = (d.range?.start?.character ?? 0) + 1;
-      const severity: "error" | "warning" = d.severity === 1 ? "error" : "warning";
-      return {
-        path: filePath,
-        line,
-        col,
-        severity,
-        message: d.message || "Unknown error",
-      };
-    });
+  if (lsp) {
+    lspClient = new LSPClient({
+      rootUri: pathToUri(lsp.rootPath),
+      extensions: languageServerExtensions(),
+    }).connect(lsp.transport);
 
-    for (const cb of diagnosticsCallbacks) {
-      cb(problems);
-    }
-  });
+    lsp.onNotification("textDocument/publishDiagnostics", (params: any) => {
+      if (!params || !params.uri) return;
+      const filePath = uriToPath(params.uri);
+      const problems: Problem[] = (params.diagnostics || []).map((d: any) => {
+        const line = (d.range?.start?.line ?? 0) + 1;
+        const col = (d.range?.start?.character ?? 0) + 1;
+        const severity: "error" | "warning" = d.severity === 1 ? "error" : "warning";
+        return {
+          path: filePath,
+          line,
+          col,
+          severity,
+          message: d.message || "Unknown error",
+        };
+      });
+
+      for (const cb of diagnosticsCallbacks) {
+        cb(problems);
+      }
+    });
+  }
 
   const f12Keymap = keymap.of([
     {
@@ -103,7 +106,7 @@ export function createEditor(parent: HTMLElement, lsp: LspConnection): EditorHan
   });
 
   function buildExtensions(fileUri: string) {
-    return [
+    const exts = [
       lineNumbers(),
       highlightActiveLineGutter(),
       history(),
@@ -118,7 +121,6 @@ export function createEditor(parent: HTMLElement, lsp: LspConnection): EditorHan
       highlightSelectionMatches(),
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
       typst(),
-      lspClient.plugin(fileUri),
       updateListener,
       f12Keymap,
       keymap.of([
@@ -132,6 +134,10 @@ export function createEditor(parent: HTMLElement, lsp: LspConnection): EditorHan
         ...lintKeymap,
       ]),
     ];
+    if (lspClient) {
+      exts.push(lspClient.plugin(fileUri));
+    }
+    return exts;
   }
 
   return {

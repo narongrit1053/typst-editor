@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { sortFileNodes, FileNode } from "./files";
+import { extractDialogPath } from "./main";
 
 describe("File tree sorting", () => {
   it("sorts directories first, then alphabetical case-insensitively", () => {
@@ -17,5 +18,24 @@ describe("File tree sorting", () => {
       "chapter1.typ",
       "chapter2.typ",
     ]);
+  });
+});
+
+describe("extractDialogPath", () => {
+  it("extracts single string", () => {
+    expect(extractDialogPath("C:/test/path")).toBe("C:/test/path");
+  });
+
+  it("extracts from array of strings", () => {
+    expect(extractDialogPath(["C:/test/path", "C:/other"])).toBe("C:/test/path");
+  });
+
+  it("extracts from object with path", () => {
+    expect(extractDialogPath({ path: "C:/test/path" })).toBe("C:/test/path");
+  });
+
+  it("returns null on null or empty", () => {
+    expect(extractDialogPath(null)).toBeNull();
+    expect(extractDialogPath([])).toBeNull();
   });
 });
