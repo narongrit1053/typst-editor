@@ -1,0 +1,194 @@
+import {
+  EditorView,
+  keymap,
+  highlightActiveLine,
+  highlightActiveLineGutter,
+  lineNumbers,
+  drawSelection,
+  dropCursor,
+  rectangularSelection,
+  crosshairCursor,
+} from "@codemirror/view";
+import { EditorState } from "@codemirror/state";
+import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
+import { autocompletion, completionKeymap, closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
+import { lintKeymap } from "@codemirror/lint";
+import { bracketMatching, syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
+import { typst } from "codemirror-lang-typst";
+import {
+  LSPClient,
+  languageServerExtensions,
+  jumpToDefinition,
+  jumpToDefinitionKeymap,
+} from "@codemirror/lsp-client";
+
+import { LspConnection, pathToUri, uriToPath } from "./lsp";
+
+export interface Problem {
+  path: string;
+  line: number;
+  col: number;
+  severity: "error" | "warning";
+  message: string;
+}
+
+export interface EditorHandle {
+  open(path: string, text: string): void;
+  getText(): string;
+  onChange(cb: () => void): void;
+  onCursor(cb: (line: number, col: number) => void): void;
+  jumpTo(line: number, col: number): void;
+  onDiagnostics(cb: (d: Problem[]) => void): void;
+  destroy(): void;
+}
+
+export function createEditor(parent: HTMLElement, lsp: LspConnection): EditorHandle {
+  const lspClient = new LSPClient({
+    rootUri: pathToUri(lsp.rootPath),
+    extensions: languageServerExtensions(),
+  }).connect(lsp.transport);
+
+  let view: EditorView | null = null;
+  const changeCallbacks: (() => void)[] = [];
+  const cursorCallbacks: ((line: number, col: number) => void)[] = [];
+  const diagnosticsCallbacks: ((d: Problem[]) => void)[] = [];
+
+  lsp.onNotification("textDocument/publishDiagnostics", (params: any) => {
+    if (!params || !params.uri) return;
+    const filePath = uriToPath(params.uri);
+    const problems: Problem[] = (params.diagnostics || []).map((d: any) => {
+      const line = (d.range?.start?.line ?? 0) + 1;
+      const col = (d.range?.start?.character ?? 0) + 1;
+      const severity: "error" | "warning" = d.severity === 1 ? "error" : "warning";
+      return {
+        path: filePath,
+        line,
+        col,
+        severity,
+        message: d.message || "Unknown error",
+      };
+    });
+
+    for (const cb of diagnosticsCallbacks) {
+      cb(problems);
+    }
+  });
+
+  const f12Keymap = keymap.of([
+    {
+      key: "F12",
+      run: (targetView) => jumpToDefinition(targetView),
+    },
+  ]);
+
+  const updateListener = EditorView.updateListener.of((update) => {
+    if (update.docChanged) {
+      for (const cb of changeCallbacks) {
+        cb();
+      }
+    }
+    if (update.selectionSet || update.docChanged) {
+      const pos = update.state.selection.main.head;
+      const line = update.state.doc.lineAt(pos);
+      const lineNum = line.number;
+      const colNum = pos - line.from + 1;
+      for (const cb of cursorCallbacks) {
+        cb(lineNum, colNum);
+      }
+    }
+  });
+
+  function buildExtensions(fileUri: string) {
+    return [
+      lineNumbers(),
+      highlightActiveLineGutter(),
+      history(),
+      drawSelection(),
+      dropCursor(),
+      bracketMatching(),
+      closeBrackets(),
+      autocompletion(),
+      rectangularSelection(),
+      crosshairCursor(),
+      highlightActiveLine(),
+      highlightSelectionMatches(),
+      syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+      typst(),
+      lspClient.plugin(fileUri),
+      updateListener,
+      f12Keymap,
+      keymap.of([
+        ...jumpToDefinitionKeymap,
+        ...closeBracketsKeymap,
+        ...defaultKeymap,
+        ...searchKeymap,
+        ...historyKeymap,
+        ...completionKeymap,
+        ...lintKeymap,
+      ]),
+    ];
+  }
+
+  return {
+    open(path: string, text: string) {
+      const fileUri = pathToUri(path);
+
+      if (view) {
+        view.destroy();
+      }
+
+      const state = EditorState.create({
+        doc: text,
+        extensions: buildExtensions(fileUri),
+      });
+
+      view = new EditorView({
+        state,
+        parent,
+      });
+
+      for (const cb of cursorCallbacks) {
+        cb(1, 1);
+      }
+    },
+
+    getText(): string {
+      return view ? view.state.doc.toString() : "";
+    },
+
+    onChange(cb: () => void) {
+      changeCallbacks.push(cb);
+    },
+
+    onCursor(cb: (line: number, col: number) => void) {
+      cursorCallbacks.push(cb);
+    },
+
+    jumpTo(line: number, col: number) {
+      if (!view) return;
+      const doc = view.state.doc;
+      const targetLine = Math.max(1, Math.min(doc.lines, line));
+      const lineObj = doc.line(targetLine);
+      const targetCol = Math.max(1, Math.min(lineObj.length + 1, col));
+      const pos = lineObj.from + targetCol - 1;
+
+      view.dispatch({
+        selection: { anchor: pos, head: pos },
+        scrollIntoView: true,
+      });
+      view.focus();
+    },
+
+    onDiagnostics(cb: (d: Problem[]) => void) {
+      diagnosticsCallbacks.push(cb);
+    },
+
+    destroy() {
+      if (view) {
+        view.destroy();
+        view = null;
+      }
+    },
+  };
+}

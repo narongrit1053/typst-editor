@@ -1,3 +1,21 @@
+import { invoke } from "@tauri-apps/api/core";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
+
+import { connectLsp, LspConnection } from "./lsp";
+import { createEditor, EditorHandle } from "./editor";
+
+let lspConnection: LspConnection | null = null;
+let editor: EditorHandle | null = null;
+let currentFilePath: string | null = null;
+
+export function getCurrentFilePath(): string | null {
+  return currentFilePath;
+}
+
+export function getCurrentEditor(): EditorHandle | null {
+  return editor;
+}
+
 function initSplitter() {
   const splitter = document.getElementById("splitter");
   const editorPane = document.getElementById("editor") as HTMLElement;
@@ -38,6 +56,65 @@ function initSplitter() {
   splitter.addEventListener("pointercancel", stopDrag);
 }
 
+export async function openFile(filePath?: string) {
+  let targetPath = filePath;
+  if (!targetPath) {
+    const selected = await openDialog({
+      filters: [{ name: "Typst Files", extensions: ["typ"] }],
+      multiple: false,
+    });
+    if (!selected || typeof selected !== "string") return;
+    targetPath = selected;
+  }
+
+  const folder = targetPath.replace(/[\\/][^\\/]+$/, "") || ".";
+  await invoke("set_root", { path: folder });
+
+  if (lspConnection) {
+    lspConnection.close();
+  }
+
+  lspConnection = await connectLsp(folder, () => {
+    console.warn("LSP exited");
+  });
+
+  const editorEl = document.getElementById("editor")!;
+  if (!editor) {
+    editor = createEditor(editorEl, lspConnection);
+    const statusPos = document.getElementById("status-pos");
+    editor.onCursor((line, col) => {
+      if (statusPos) {
+        statusPos.textContent = `Ln ${line}, Col ${col}`;
+      }
+    });
+  }
+
+  const content = await invoke<string>("read_file", { path: targetPath });
+  currentFilePath = targetPath;
+  editor.open(targetPath, content);
+
+  const fileNameEl = document.getElementById("file-name");
+  if (fileNameEl) {
+    const baseName = targetPath.split(/[\\/]/).pop() || targetPath;
+    fileNameEl.textContent = baseName;
+    fileNameEl.title = targetPath;
+  }
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   initSplitter();
+
+  const btnOpen = document.getElementById("btn-open");
+  if (btnOpen) {
+    btnOpen.addEventListener("click", () => {
+      openFile().catch(console.error);
+    });
+  }
+
+  window.addEventListener("keydown", (e) => {
+    if (e.ctrlKey && e.key.toLowerCase() === "o") {
+      e.preventDefault();
+      openFile().catch(console.error);
+    }
+  });
 });
