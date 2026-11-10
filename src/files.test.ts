@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { sortFileNodes, FileNode, isImagePath } from "./files";
-import { extractDialogPath } from "./main";
+import { extractDialogPath, lineSampleColumns } from "./main";
 
 describe("isImagePath", () => {
   it("matches image extensions case-insensitively", () => {
@@ -49,5 +49,18 @@ describe("extractDialogPath", () => {
   it("returns null on null or empty", () => {
     expect(extractDialogPath(null)).toBeNull();
     expect(extractDialogPath([])).toBeNull();
+  });
+});
+
+describe("lineSampleColumns", () => {
+  it("samples every non-space column and ends on the clicked one", () => {
+    expect(lineSampleColumns("a b $x$", 3)).toEqual([1, 5, 6, 7, 3]);
+  });
+
+  it("caps long lines but still includes the clicked column last", () => {
+    const cols = lineSampleColumns("x".repeat(500), 250, 40);
+    expect(cols.length).toBeLessThanOrEqual(41);
+    expect(cols[0]).toBe(1);
+    expect(cols[cols.length - 1]).toBe(250);
   });
 });

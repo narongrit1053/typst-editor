@@ -913,3 +913,13 @@ html, body {
   /* checkerboard so transparent images stay visible */
   background: repeating-conic-gradient(#8884 0% 25%, transparent 0% 50%) 50% / 16px 16px;
 }
+
+/* Orange fade on the editor text a preview double-click jumped to */
+@keyframes cm-jump-flash {
+  from { background-color: rgba(255, 140, 0, 0.55); }
+  to { background-color: transparent; }
+}
+
+.cm-jump-flash {
+  animation: cm-jump-flash 2s ease-out;
+}

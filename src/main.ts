@@ -375,64 +375,94 @@ export async function refreshOutline() {
 let isJumpingFromPreview = false;
 let scrollSyncTimer: any = null;
 
+// Columns (1-based) to jump to so the preview can flash everything rendered from a source line.
+// Tinymist only maps single points, so we sample the line's non-space characters (capped) and
+// the injected preview script (src-tauri/src/preview_flash.js) collects all resulting jump marks.
+// The clicked column goes last so the final scroll lands where the user double-clicked.
+export function lineSampleColumns(text: string, clickedCol: number, max = 40): number[] {
+  const cols: number[] = [];
+  for (let i = 0; i < text.length; i++) {
+    if (!/\s/.test(text[i])) cols.push(i + 1);
+  }
+  const step = Math.max(1, Math.ceil(cols.length / max));
+  const picked = cols.filter((_, i) => i % step === 0 && cols[i] !== clickedCol);
+  return [...picked, clickedCol];
+}
+
 function syncPreviewToEditor(line: number, col: number) {
   if (isJumpingFromPreview || !lspConnection || !currentFilePath) return;
   if (scrollSyncTimer) clearTimeout(scrollSyncTimer);
+  const lineText = editor?.getText().split(/\r?\n/)[line - 1] ?? "";
   scrollSyncTimer = setTimeout(() => {
-    lspConnection?.request("workspace/executeCommand", {
-      command: "tinymist.scrollPreview",
-      arguments: [
-        "default_preview",
-        {
-          event: "panelScrollTo",
-          filepath: currentFilePath,
-          line: line - 1,
-          character: col - 1,
-        },
-      ],
-    }).catch(() => {});
+    for (const c of lineSampleColumns(lineText, col)) {
+      lspConnection?.request("workspace/executeCommand", {
+        command: "tinymist.scrollPreview",
+        arguments: [
+          "default_preview",
+          {
+            event: "panelScrollTo",
+            filepath: currentFilePath,
+            line: line - 1,
+            character: c - 1,
+          },
+        ],
+      }).catch(() => {});
+    }
   }, 100);
 }
 
-let lastShowDocTime = 0;
-let lastShowDocUri = "";
+// Tinymist sends exactly one window/showDocument per preview click, single or double, so the
+// LSP stream can't tell them apart. The injected preview script (src-tauri/src/preview_flash.js)
+// reports double-clicks via postMessage; we jump only when the two arrive within PAIR_MS.
+const PAIR_MS = 600;
+let pendingShowDoc: { params: any; time: number } | null = null;
+let lastPreviewDblClick = 0;
+
+function jumpFromPreview(params: any) {
+  const targetPath = uriToPath(params.uri);
+  const start = params.selection?.start || { line: 0, character: 0 };
+  const end = params.selection?.end || start;
+
+  const sLine = start.line + 1;
+  const sCol = start.character + 1;
+  const eLine = end.line + 1;
+  const eCol = end.character + 1;
+
+  const handleJump = () => {
+    isJumpingFromPreview = true;
+    editor?.jumpToRange(sLine, sCol, eLine, eCol, true);
+    setTimeout(() => {
+      isJumpingFromPreview = false;
+    }, 250);
+  };
+
+  if (currentFilePath && normalizePath(targetPath) === normalizePath(currentFilePath)) {
+    handleJump();
+  } else {
+    openFile(targetPath).then(() => {
+      handleJump();
+    });
+  }
+}
+
+function onPreviewDoubleClick() {
+  if (pendingShowDoc && Date.now() - pendingShowDoc.time < PAIR_MS) {
+    const { params } = pendingShowDoc;
+    pendingShowDoc = null;
+    jumpFromPreview(params);
+  } else {
+    lastPreviewDblClick = Date.now();
+  }
+}
 
 function setupLspHandlers(lsp: LspConnection) {
   lsp.onNotification("window/showDocument", (params: any) => {
     if (!params || !params.uri) return;
-    const now = Date.now();
-    const uriKey = `${params.uri}:${params.selection?.start?.line}:${params.selection?.start?.character}`;
-    if (now - lastShowDocTime > 400 || uriKey !== lastShowDocUri) {
-      lastShowDocTime = now;
-      lastShowDocUri = uriKey;
-      return;
-    }
-    lastShowDocTime = 0;
-    lastShowDocUri = "";
-
-    const targetPath = uriToPath(params.uri);
-    const start = params.selection?.start || { line: 0, character: 0 };
-    const end = params.selection?.end || start;
-
-    const sLine = start.line + 1;
-    const sCol = start.character + 1;
-    const eLine = end.line + 1;
-    const eCol = end.character + 1;
-
-    const handleJump = () => {
-      isJumpingFromPreview = true;
-      editor?.jumpToRange(sLine, sCol, eLine, eCol);
-      setTimeout(() => {
-        isJumpingFromPreview = false;
-      }, 250);
-    };
-
-    if (currentFilePath && normalizePath(targetPath) === normalizePath(currentFilePath)) {
-      handleJump();
+    if (Date.now() - lastPreviewDblClick < PAIR_MS) {
+      lastPreviewDblClick = 0;
+      jumpFromPreview(params);
     } else {
-      openFile(targetPath).then(() => {
-        handleJump();
-      });
+      pendingShowDoc = { params, time: Date.now() };
     }
   });
 }
@@ -967,6 +997,12 @@ function initApp() {
 
   let lastPreviewSyncTime = 0;
   let lastPreviewSyncLoc = "";
+  window.addEventListener("message", (event) => {
+    if (event.origin.startsWith("http://127.0.0.1:") && event.data?.type === "kong-preview-dblclick") {
+      onPreviewDoubleClick();
+    }
+  });
+
   initPreviewSync((file, line, col) => {
     const now = Date.now();
     const locKey = `${file}:${line}:${col}`;
@@ -982,10 +1018,10 @@ function initApp() {
     const normCurrent = normalizePath(currentFilePath);
     if (normFile && normFile !== normCurrent) {
       openFile(file).then(() => {
-        editor?.jumpTo(line, col);
+        editor?.jumpToRange(line, col, line, col, true);
       });
     } else {
-      editor?.jumpTo(line, col);
+      editor?.jumpToRange(line, col, line, col, true);
     }
   });
 

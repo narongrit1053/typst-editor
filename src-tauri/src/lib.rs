@@ -17,6 +17,12 @@ pub struct AppState {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        // On Windows init scripts also run in sub-frames, which reaches the preview iframe.
+        .plugin(
+            tauri::plugin::Builder::<tauri::Wry, ()>::new("preview-flash")
+                .js_init_script_on_all_frames(include_str!("preview_flash.js"))
+                .build(),
+        )
         .manage(AppState {
             root: Mutex::new(None),
             lsp: Mutex::new(None),

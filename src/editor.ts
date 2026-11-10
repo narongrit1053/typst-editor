@@ -8,8 +8,10 @@ import {
   dropCursor,
   rectangularSelection,
   crosshairCursor,
+  Decoration,
+  DecorationSet,
 } from "@codemirror/view";
-import { EditorState, Compartment } from "@codemirror/state";
+import { EditorState, Compartment, StateEffect, StateField } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { autocompletion, completionKeymap, closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
@@ -31,6 +33,33 @@ export function fixRawTextWhitespace(text: string): string {
   return text.replace(/(^|[^`])```([^\s\n`][^`\n]*```)/g, "$1``` $2");
 }
 
+// Orange fade on the jump target (preview -> editor). A fresh data-n per flash makes
+// CodeMirror rebuild the DOM so the CSS animation restarts on repeated jumps.
+const setFlash = StateEffect.define<{ from: number; to: number; n: number } | null>();
+const flashField = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(deco, tr) {
+    deco = deco.map(tr.changes);
+    for (const e of tr.effects) {
+      if (!e.is(setFlash)) continue;
+      if (!e.value) {
+        deco = Decoration.none;
+        continue;
+      }
+      const { from, to, n } = e.value;
+      const attrs = { class: "cm-jump-flash", attributes: { "data-n": String(n) } };
+      deco = Decoration.set([
+        // Line decorations must sit at the start of a line.
+        from === to
+          ? Decoration.line(attrs).range(tr.state.doc.lineAt(from).from)
+          : Decoration.mark(attrs).range(from, to),
+      ]);
+    }
+    return deco;
+  },
+  provide: (f) => EditorView.decorations.from(f),
+});
+
 export interface Problem {
   path: string;
   line: number;
@@ -47,7 +76,7 @@ export interface EditorHandle {
   onCursor(cb: (line: number, col: number) => void): void;
   onDoubleClick(cb: (line: number, col: number) => void): void;
   jumpTo(line: number, col: number): void;
-  jumpToRange(startLine: number, startCol: number, endLine?: number, endCol?: number): void;
+  jumpToRange(startLine: number, startCol: number, endLine?: number, endCol?: number, flash?: boolean): void;
   setWordWrap(enabled: boolean): void;
   setTheme(dark: boolean): void;
   onDiagnostics(cb: (d: Problem[]) => void): void;
@@ -73,6 +102,8 @@ export function createEditor(
   const cursorCallbacks: ((line: number, col: number) => void)[] = [];
   const doubleClickCallbacks: ((line: number, col: number) => void)[] = [];
   const diagnosticsCallbacks: ((d: Problem[]) => void)[] = [];
+  let flashCount = 0;
+  let flashTimer: ReturnType<typeof setTimeout> | null = null;
 
   if (lsp) {
     lspClient = new LSPClient({
@@ -145,6 +176,7 @@ export function createEditor(
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
       typst(),
       updateListener,
+      flashField,
       EditorView.domEventHandlers({
         dblclick: (event, targetView) => {
           const pos = targetView.posAtCoords({ x: event.clientX, y: event.clientY });
@@ -245,7 +277,7 @@ export function createEditor(
       });
     },
 
-    jumpToRange(startLine: number, startCol: number, endLine?: number, endCol?: number) {
+    jumpToRange(startLine: number, startCol: number, endLine?: number, endCol?: number, flash = false) {
       if (!view) return;
       const doc = view.state.doc;
       const sLine = Math.max(1, Math.min(doc.lines, startLine));
@@ -263,9 +295,20 @@ export function createEditor(
 
       view.dispatch({
         selection: { anchor, head },
-        scrollIntoView: true,
+        // Preview jumps put the target ~35% down the editor (a bit above center); others scroll minimally.
+        scrollIntoView: !flash,
+        effects: flash
+          ? [
+              setFlash.of({ from: Math.min(anchor, head), to: Math.max(anchor, head), n: ++flashCount }),
+              EditorView.scrollIntoView(anchor, { y: "start", yMargin: view.scrollDOM.clientHeight * 0.35 }),
+            ]
+          : [],
       });
       view.focus();
+      if (flash) {
+        if (flashTimer) clearTimeout(flashTimer);
+        flashTimer = setTimeout(() => view?.dispatch({ effects: setFlash.of(null) }), 2000);
+      }
     },
 
     jumpTo(line: number, col: number) {
