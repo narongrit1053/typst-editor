@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::Manager;
 
+pub mod commands;
 pub mod lsp_bridge;
 pub mod lsp_frame;
 
@@ -15,6 +16,7 @@ pub struct AppState {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(AppState {
             root: Mutex::new(None),
             lsp: Mutex::new(None),
@@ -23,6 +25,9 @@ pub fn run() {
             lsp_bridge::lsp_start,
             lsp_bridge::lsp_send,
             lsp_bridge::lsp_stop,
+            commands::set_root,
+            commands::read_file,
+            commands::write_file,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
