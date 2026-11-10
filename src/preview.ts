@@ -105,6 +105,7 @@ export async function startPreview(
   activeLsp = lsp;
 
   try {
+    // No --partial-rendering: it renders pages lazily on scroll, which made scrolling the preview laggy.
     const previewArgs = ["--no-open", "--data-plane-host", "127.0.0.1:0"];
     if (fontPath) {
       previewArgs.push("--font-path", fontPath);
