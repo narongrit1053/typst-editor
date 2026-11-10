@@ -21,6 +21,8 @@ import {
   languageServerExtensions,
   jumpToDefinition,
   jumpToDefinitionKeymap,
+  formatDocument,
+  formatKeymap,
 } from "@codemirror/lsp-client";
 
 import { LspConnection, pathToUri, uriToPath } from "./lsp";
@@ -36,6 +38,7 @@ export interface Problem {
 export interface EditorHandle {
   open(path: string, text: string): void;
   getText(): string;
+  format(): boolean;
   onChange(cb: () => void): void;
   onCursor(cb: (line: number, col: number) => void): void;
   jumpTo(line: number, col: number): void;
@@ -119,6 +122,7 @@ export function createEditor(parent: HTMLElement, lsp: LspConnection): EditorHan
       updateListener,
       f12Keymap,
       keymap.of([
+        ...formatKeymap,
         ...jumpToDefinitionKeymap,
         ...closeBracketsKeymap,
         ...defaultKeymap,
@@ -155,6 +159,11 @@ export function createEditor(parent: HTMLElement, lsp: LspConnection): EditorHan
 
     getText(): string {
       return view ? view.state.doc.toString() : "";
+    },
+
+    format(): boolean {
+      if (!view) return false;
+      return formatDocument(view);
     },
 
     onChange(cb: () => void) {

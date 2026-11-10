@@ -2,20 +2,40 @@ import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog, save as saveDialog, ask } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
-import { connectLsp, LspConnection } from "./lsp";
+import { connectLsp, LspConnection, pathToUri } from "./lsp";
 import { createEditor, EditorHandle } from "./editor";
-import { startPreview, stopPreview } from "./preview";
+import {
+  startPreview,
+  stopPreview,
+  zoomIn,
+  zoomOut,
+  resetZoom,
+  initPreviewSync,
+} from "./preview";
 import { detectEol, withEol, createSaver, Saver } from "./document";
 import { renderProblems, summarise } from "./problems";
+import { fetchDirectoryEntries, renderFileTree, toggleSidebar } from "./files";
+import { parseOutlineSymbols, renderOutline } from "./outline";
+import { showQuickOpen } from "./quick_open";
+import {
+  loadSettings,
+  saveSettings,
+  initSettingsModal,
+  getCachedSettings,
+} from "./settings";
 
 let lspConnection: LspConnection | null = null;
 let editor: EditorHandle | null = null;
 let saver: Saver | null = null;
+let currentProjectFolder: string | null = null;
 let currentFilePath: string | null = null;
+let pinnedFilePath: string | null = null;
 let currentEol: "\r\n" | "\n" = "\n";
+let outlineTimer: any = null;
 
 let lastRestartTime = 0;
 let isReconnecting = false;
+let flatWorkspaceFiles: string[] = [];
 
 export function getCurrentFilePath(): string | null {
   return currentFilePath;
@@ -140,11 +160,205 @@ function initSplitter() {
   splitter.addEventListener("pointercancel", stopDrag);
 }
 
-async function reconnectLsp() {
-  if (!currentFilePath) return;
-  isReconnecting = true;
+export async function refreshFileTree() {
+  const treeContainer = document.getElementById("file-tree");
+  if (!treeContainer) return;
+
+  if (!currentProjectFolder) {
+    treeContainer.replaceChildren();
+    return;
+  }
+
   try {
-    const folder = currentFilePath.replace(/[\\/][^\\/]+$/, "") || ".";
+    const entries = await fetchDirectoryEntries();
+    renderFileTree(
+      treeContainer,
+      entries,
+      currentFilePath,
+      pinnedFilePath,
+      async (selectedPath) => {
+        await openFile(selectedPath);
+      },
+      async (pinPath) => {
+        await setMainFile(pinPath);
+      },
+      async (deletePath) => {
+        await deleteItem(deletePath);
+      },
+      async (renamePath) => {
+        await renameItem(renamePath);
+      },
+    );
+
+    // Collect flat list of files recursively for Quick Open
+    flatWorkspaceFiles = await collectAllWorkspaceFiles();
+  } catch (err) {
+    console.warn("Failed to refresh file tree:", err);
+  }
+}
+
+async function collectAllWorkspaceFiles(dir?: string): Promise<string[]> {
+  const results: string[] = [];
+  try {
+    const raw = await invoke<Array<{ name: string; path: string; is_dir: boolean }>>("list_dir", {
+      path: dir,
+    });
+    for (const item of raw) {
+      if (item.is_dir) {
+        const subFiles = await collectAllWorkspaceFiles(item.path);
+        results.push(...subFiles);
+      } else {
+        results.push(item.path);
+      }
+    }
+  } catch {}
+  return results;
+}
+
+export async function setMainFile(path: string | null) {
+  pinnedFilePath = path;
+  if (currentProjectFolder) {
+    const settings = getCachedSettings();
+    if (path) {
+      settings.mainPins[currentProjectFolder] = path;
+    } else {
+      delete settings.mainPins[currentProjectFolder];
+    }
+    await saveSettings(settings);
+  }
+
+  if (lspConnection) {
+    try {
+      await lspConnection.request("workspace/executeCommand", {
+        command: "tinymist.pinMain",
+        arguments: path ? [path] : [null],
+      });
+    } catch (e) {
+      console.warn("Failed to pin main file via LSP:", e);
+    }
+  }
+
+  await refreshFileTree();
+
+  const previewFrame = document.getElementById("preview") as HTMLIFrameElement;
+  const targetPreview = pinnedFilePath || currentFilePath;
+  if (previewFrame && lspConnection && targetPreview) {
+    startPreview(previewFrame, lspConnection, targetPreview).catch(console.error);
+  }
+}
+
+async function deleteItem(path: string) {
+  const baseName = path.split(/[\\/]/).pop() || path;
+  const confirmed = await ask(`Are you sure you want to delete "${baseName}"?`, {
+    title: "Confirm Delete",
+    kind: "warning",
+  });
+  if (!confirmed) return;
+
+  try {
+    await invoke("delete_path", { path });
+    if (currentFilePath === path) {
+      currentFilePath = null;
+      updateFileNameDisplay(null, false);
+      editor?.open("", "");
+    }
+    if (pinnedFilePath === path) {
+      await setMainFile(null);
+    }
+    await refreshFileTree();
+  } catch (e: any) {
+    showBanner(`Failed to delete: ${e?.message || e}`);
+  }
+}
+
+async function renameItem(oldPath: string) {
+  const oldName = oldPath.split(/[\\/]/).pop() || oldPath;
+  const newName = window.prompt("New name:", oldName);
+  if (!newName || newName.trim() === "" || newName === oldName) return;
+
+  const parent = oldPath.replace(/[\\/][^\\/]+$/, "");
+  const newPath = `${parent}/${newName.trim()}`;
+
+  try {
+    await invoke("rename_path", { oldPath, newPath });
+    if (currentFilePath === oldPath) {
+      currentFilePath = newPath;
+      updateFileNameDisplay(newPath, saver?.isDirty() || false);
+    }
+    if (pinnedFilePath === oldPath) {
+      pinnedFilePath = newPath;
+      if (currentProjectFolder) {
+        const settings = getCachedSettings();
+        settings.mainPins[currentProjectFolder] = newPath;
+        await saveSettings(settings);
+      }
+    }
+    await refreshFileTree();
+  } catch (e: any) {
+    showBanner(`Failed to rename: ${e?.message || e}`);
+  }
+}
+
+async function createNewFile() {
+  if (!currentProjectFolder) return;
+  const name = window.prompt("New file name (e.g. chapter1.typ):");
+  if (!name || name.trim() === "") return;
+
+  const targetPath = `${currentProjectFolder}/${name.trim()}`;
+  try {
+    await invoke("create_file", { path: targetPath });
+    await refreshFileTree();
+    await openFile(targetPath);
+  } catch (e: any) {
+    showBanner(`Failed to create file: ${e?.message || e}`);
+  }
+}
+
+async function createNewFolder() {
+  if (!currentProjectFolder) return;
+  const name = window.prompt("New folder name:");
+  if (!name || name.trim() === "") return;
+
+  const targetPath = `${currentProjectFolder}/${name.trim()}`;
+  try {
+    await invoke("create_dir", { path: targetPath });
+    await refreshFileTree();
+  } catch (e: any) {
+    showBanner(`Failed to create folder: ${e?.message || e}`);
+  }
+}
+
+export async function refreshOutline() {
+  const outlineEl = document.getElementById("outline-tree");
+  if (!outlineEl || !lspConnection || !currentFilePath) return;
+
+  try {
+    const symbols = (await lspConnection.request("textDocument/documentSymbol", {
+      textDocument: { uri: pathToUri(currentFilePath) },
+    })) as any[];
+
+    const items = parseOutlineSymbols(symbols || []);
+    renderOutline(outlineEl, items, (item) => {
+      editor?.jumpTo(item.line, item.col);
+    });
+  } catch (e) {
+    console.warn("Failed to fetch outline symbols:", e);
+  }
+}
+
+function scheduleOutlineRefresh() {
+  if (outlineTimer) clearTimeout(outlineTimer);
+  outlineTimer = setTimeout(() => {
+    refreshOutline().catch(() => {});
+  }, 1200);
+}
+
+async function reconnectLsp() {
+  if (!currentFilePath && !currentProjectFolder) return;
+  isReconnecting = true;
+  const folder = currentProjectFolder || currentFilePath!.replace(/[\\/][^\\/]+$/, "") || ".";
+
+  try {
     if (lspConnection) {
       try {
         lspConnection.close();
@@ -156,7 +370,11 @@ async function reconnectLsp() {
     });
 
     const editorEl = document.getElementById("editor")!;
-    const currentText = editor ? editor.getText() : await invoke<string>("read_file", { path: currentFilePath });
+    const currentText = editor
+      ? editor.getText()
+      : currentFilePath
+        ? await invoke<string>("read_file", { path: currentFilePath })
+        : "";
 
     if (editor) {
       editor.destroy();
@@ -185,13 +403,17 @@ async function reconnectLsp() {
 
     editor.onChange(() => {
       saver?.touch();
+      scheduleOutlineRefresh();
     });
 
-    editor.open(currentFilePath, currentText);
-
-    const previewFrame = document.getElementById("preview") as HTMLIFrameElement;
-    if (previewFrame && lspConnection) {
-      await startPreview(previewFrame, lspConnection, currentFilePath);
+    if (currentFilePath) {
+      editor.open(currentFilePath, currentText);
+      const previewFrame = document.getElementById("preview") as HTMLIFrameElement;
+      const targetPreview = pinnedFilePath || currentFilePath;
+      if (previewFrame && lspConnection && targetPreview) {
+        await startPreview(previewFrame, lspConnection, targetPreview);
+      }
+      refreshOutline().catch(() => {});
     }
   } finally {
     isReconnecting = false;
@@ -199,7 +421,7 @@ async function reconnectLsp() {
 }
 
 async function handleLspExit() {
-  if (isReconnecting || !currentFilePath) return;
+  if (isReconnecting || (!currentFilePath && !currentProjectFolder)) return;
   const now = Date.now();
   const timeSinceLastRestart = now - lastRestartTime;
 
@@ -226,7 +448,8 @@ async function handleLspExit() {
 }
 
 export async function exportPdf() {
-  if (!currentFilePath) return;
+  const targetExport = pinnedFilePath || currentFilePath;
+  if (!targetExport) return;
 
   if (saver) {
     try {
@@ -237,7 +460,7 @@ export async function exportPdf() {
     }
   }
 
-  const defaultPdfPath = currentFilePath.replace(/\.[^/\\.]+$/, "") + ".pdf";
+  const defaultPdfPath = targetExport.replace(/\.[^/\\.]+$/, "") + ".pdf";
   const outPath = await saveDialog({
     defaultPath: defaultPdfPath,
     filters: [{ name: "PDF Document", extensions: ["pdf"] }],
@@ -247,7 +470,7 @@ export async function exportPdf() {
 
   const statusState = document.getElementById("status-state");
   try {
-    await invoke("export_pdf", { main: currentFilePath, out: outPath });
+    await invoke("export_pdf", { main: targetExport, out: outPath });
     hideBanner();
     const pdfName = outPath.split(/[\\/]/).pop() || outPath;
     if (statusState) {
@@ -260,6 +483,61 @@ export async function exportPdf() {
     } else {
       showBanner(`Export failed: ${msg}`);
     }
+  }
+}
+
+export async function openFolder(folderPath?: string) {
+  let targetFolder = folderPath;
+  if (!targetFolder) {
+    const selected = await openDialog({
+      directory: true,
+      multiple: false,
+    });
+    if (!selected || typeof selected !== "string") return;
+    targetFolder = selected;
+  }
+
+  if (saver && saver.isDirty()) {
+    try {
+      await saver.saveNow();
+    } catch {}
+  }
+
+  currentProjectFolder = targetFolder;
+  await stopPreview();
+  await invoke("set_root", { path: targetFolder });
+
+  if (lspConnection) {
+    lspConnection.close();
+  }
+
+  lastRestartTime = 0;
+  lspConnection = await connectLsp(targetFolder, () => {
+    handleLspExit();
+  });
+
+  // Restore main pin if configured
+  const settings = getCachedSettings();
+  pinnedFilePath = settings.mainPins[targetFolder] || null;
+
+  // Add to recents
+  const recents = (settings.recentFolders || []).filter((f) => f !== targetFolder);
+  recents.unshift(targetFolder);
+  settings.recentFolders = recents.slice(0, 10);
+  await saveSettings(settings);
+
+  await refreshFileTree();
+
+  // Pick entry file: pinned file if exists, or main.typ, or first .typ file
+  let fileToOpen = pinnedFilePath;
+  if (!fileToOpen || !flatWorkspaceFiles.includes(fileToOpen)) {
+    const mainTyp = flatWorkspaceFiles.find((f) => f.endsWith("main.typ"));
+    const anyTyp = flatWorkspaceFiles.find((f) => f.endsWith(".typ"));
+    fileToOpen = mainTyp || anyTyp || null;
+  }
+
+  if (fileToOpen) {
+    await openFile(fileToOpen);
   }
 }
 
@@ -281,20 +559,24 @@ export async function openFile(filePath?: string) {
   }
 
   const folder = targetPath.replace(/[\\/][^\\/]+$/, "") || ".";
-  await stopPreview();
-  await invoke("set_root", { path: folder });
 
-  if (lspConnection) {
-    lspConnection.close();
+  if (!currentProjectFolder) {
+    currentProjectFolder = folder;
+    await stopPreview();
+    await invoke("set_root", { path: folder });
+
+    if (lspConnection) {
+      lspConnection.close();
+    }
+
+    lastRestartTime = 0;
+    lspConnection = await connectLsp(folder, () => {
+      handleLspExit();
+    });
   }
 
-  lastRestartTime = 0;
-  lspConnection = await connectLsp(folder, () => {
-    handleLspExit();
-  });
-
   const editorEl = document.getElementById("editor")!;
-  if (!editor) {
+  if (!editor && lspConnection) {
     editor = createEditor(editorEl, lspConnection);
     const statusPos = document.getElementById("status-pos");
     editor.onCursor((line, col) => {
@@ -321,6 +603,8 @@ export async function openFile(filePath?: string) {
   currentFilePath = targetPath;
   currentEol = detectEol(content);
 
+  const settings = getCachedSettings();
+
   saver = createSaver({
     getText: () => editor?.getText() || "",
     write: async (text) => {
@@ -339,43 +623,144 @@ export async function openFile(filePath?: string) {
         showBanner(`Save failed: ${err || "Unknown error"}`);
       }
     },
-    delayMs: 1000,
+    delayMs: settings.autosave ? 1000 : 999999999,
   });
 
-  editor.onChange(() => {
-    saver?.touch();
+  editor?.onChange(() => {
+    if (settings.autosave) {
+      saver?.touch();
+    }
+    scheduleOutlineRefresh();
   });
 
-  editor.open(targetPath, content);
+  editor?.open(targetPath, content);
   updateFileNameDisplay(targetPath, false);
 
   const previewFrame = document.getElementById("preview") as HTMLIFrameElement;
+  const targetPreview = pinnedFilePath || targetPath;
   if (previewFrame && lspConnection) {
-    startPreview(previewFrame, lspConnection, targetPath).catch((err) => {
+    startPreview(previewFrame, lspConnection, targetPreview).catch((err) => {
       console.error("Preview start failed:", err);
     });
   }
+
+  await refreshFileTree();
+  scheduleOutlineRefresh();
+}
+
+async function handleExternalFileChange() {
+  if (!currentFilePath || !editor) return;
+
+  try {
+    const diskContent = await invoke<string>("read_file", { path: currentFilePath });
+    const currentText = editor.getText();
+    if (diskContent === currentText) return;
+
+    if (saver && !saver.isDirty()) {
+      editor.open(currentFilePath, diskContent);
+      scheduleOutlineRefresh();
+    } else if (saver && saver.isDirty()) {
+      const reload = await ask(
+        "This file has been modified on disk by another program.\n\nDo you want to reload it from disk and overwrite your unsaved edits?",
+        { title: "Typst-Editor by Kong", kind: "warning" },
+      );
+      if (reload) {
+        editor.open(currentFilePath, diskContent);
+        saver.saveNow().catch(() => {});
+        scheduleOutlineRefresh();
+      }
+    }
+  } catch {}
 }
 
 window.addEventListener("DOMContentLoaded", async () => {
+  await loadSettings();
+  initSettingsModal();
   initSplitter();
 
+  initPreviewSync((file, line, col) => {
+    if (file && file !== currentFilePath) {
+      openFile(file).then(() => {
+        editor?.jumpTo(line, col);
+      });
+    } else {
+      editor?.jumpTo(line, col);
+    }
+  });
+
+  const previewFrame = document.getElementById("preview") as HTMLIFrameElement;
+
+  // Zoom controls
+  const btnZoomIn = document.getElementById("btn-zoom-in");
+  const btnZoomOut = document.getElementById("btn-zoom-out");
+  const btnZoomReset = document.getElementById("btn-zoom-reset");
+
+  const updateZoomLabel = (z: number) => {
+    if (btnZoomReset) {
+      btnZoomReset.textContent = `${Math.round(z * 100)}%`;
+    }
+  };
+
+  btnZoomIn?.addEventListener("click", () => {
+    if (previewFrame) updateZoomLabel(zoomIn(previewFrame));
+  });
+  btnZoomOut?.addEventListener("click", () => {
+    if (previewFrame) updateZoomLabel(zoomOut(previewFrame));
+  });
+  btnZoomReset?.addEventListener("click", () => {
+    if (previewFrame) updateZoomLabel(resetZoom(previewFrame));
+  });
+
+  // Sidebar buttons
+  const btnSidebar = document.getElementById("btn-sidebar");
+  btnSidebar?.addEventListener("click", () => {
+    toggleSidebar();
+  });
+
+  const btnNewFile = document.getElementById("btn-new-file");
+  btnNewFile?.addEventListener("click", () => {
+    createNewFile().catch(console.error);
+  });
+
+  const btnNewFolder = document.getElementById("btn-new-folder");
+  btnNewFolder?.addEventListener("click", () => {
+    createNewFolder().catch(console.error);
+  });
+
+  // Open buttons
   const btnOpen = document.getElementById("btn-open");
-  if (btnOpen) {
-    btnOpen.addEventListener("click", () => {
-      openFile().catch(console.error);
-    });
-  }
+  btnOpen?.addEventListener("click", () => {
+    openFile().catch(console.error);
+  });
 
+  const btnOpenFolder = document.getElementById("btn-open-folder");
+  btnOpenFolder?.addEventListener("click", () => {
+    openFolder().catch(console.error);
+  });
+
+  // Format button
+  const btnFormat = document.getElementById("btn-format");
+  btnFormat?.addEventListener("click", () => {
+    editor?.format();
+  });
+
+  // Export button
   const btnExport = document.getElementById("btn-export");
-  if (btnExport) {
-    btnExport.addEventListener("click", () => {
-      exportPdf().catch(console.error);
-    });
-  }
+  btnExport?.addEventListener("click", () => {
+    exportPdf().catch(console.error);
+  });
 
+  // Global key shortcuts
   window.addEventListener("keydown", (e) => {
-    if (e.ctrlKey && e.key.toLowerCase() === "o") {
+    if (e.ctrlKey && e.key.toLowerCase() === "b") {
+      e.preventDefault();
+      toggleSidebar();
+    } else if (e.ctrlKey && e.key.toLowerCase() === "p") {
+      e.preventDefault();
+      showQuickOpen(flatWorkspaceFiles, (path) => {
+        openFile(path).catch(console.error);
+      });
+    } else if (e.ctrlKey && e.key.toLowerCase() === "o") {
       e.preventDefault();
       openFile().catch(console.error);
     } else if (e.ctrlKey && e.key.toLowerCase() === "s") {
@@ -388,7 +773,24 @@ window.addEventListener("DOMContentLoaded", async () => {
     } else if (e.ctrlKey && e.key.toLowerCase() === "e") {
       e.preventDefault();
       exportPdf().catch(console.error);
+    } else if (e.shiftKey && e.altKey && e.key.toLowerCase() === "f") {
+      e.preventDefault();
+      editor?.format();
+    } else if (e.ctrlKey && (e.key === "=" || e.key === "+")) {
+      e.preventDefault();
+      if (previewFrame) updateZoomLabel(zoomIn(previewFrame));
+    } else if (e.ctrlKey && e.key === "-") {
+      e.preventDefault();
+      if (previewFrame) updateZoomLabel(zoomOut(previewFrame));
+    } else if (e.ctrlKey && e.key === "0") {
+      e.preventDefault();
+      if (previewFrame) updateZoomLabel(resetZoom(previewFrame));
     }
+  });
+
+  // Window focus check
+  window.addEventListener("focus", () => {
+    handleExternalFileChange().catch(console.error);
   });
 
   try {
