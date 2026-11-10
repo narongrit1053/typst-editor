@@ -1,7 +1,14 @@
+use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use tauri::State;
 use crate::AppState;
+
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 pub fn resolve_inside(root: &Path, candidate: &Path) -> Result<PathBuf, String> {
     let root_canon = fs::canonicalize(root).map_err(|e| format!("NO_ROOT: {}", e))?;
@@ -35,6 +42,28 @@ pub fn write_file_atomic(path: &Path, contents: &str) -> Result<(), String> {
     Ok(())
 }
 
+pub fn export_args(
+    main: &Path,
+    out: &Path,
+    root: &Path,
+    font_dir: Option<&Path>,
+) -> Vec<OsString> {
+    let mut args = vec![
+        OsString::from("compile"),
+        main.as_os_str().to_os_string(),
+        out.as_os_str().to_os_string(),
+        OsString::from("--root"),
+        root.as_os_str().to_os_string(),
+    ];
+
+    if let Some(fonts) = font_dir {
+        args.push(OsString::from("--font-path"));
+        args.push(fonts.as_os_str().to_os_string());
+    }
+
+    args
+}
+
 #[tauri::command]
 pub fn set_root(state: State<'_, AppState>, path: String) -> Result<(), String> {
     let p = PathBuf::from(path);
@@ -57,6 +86,49 @@ pub fn write_file(state: State<'_, AppState>, path: String, contents: String) ->
     let root = root_guard.as_ref().ok_or_else(|| "NO_ROOT".to_string())?;
     let target = resolve_inside(root, Path::new(&path))?;
     write_file_atomic(&target, &contents)
+}
+
+#[tauri::command]
+pub fn export_pdf(state: State<'_, AppState>, main: String, out: String) -> Result<(), String> {
+    let root_guard = state.root.lock().map_err(|e| e.to_string())?;
+    let root = root_guard.as_ref().ok_or_else(|| "NO_ROOT".to_string())?;
+
+    let main_path = resolve_inside(root, Path::new(&main))?;
+    let out_path = PathBuf::from(out);
+
+    let font_candidate = root.join("fonts");
+    let font_dir = if font_candidate.is_dir() {
+        Some(font_candidate.as_path())
+    } else {
+        None
+    };
+
+    let args = export_args(&main_path, &out_path, root, font_dir);
+
+    let mut cmd = Command::new("typst");
+    cmd.args(args);
+
+    #[cfg(windows)]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+
+    let output = cmd.output().map_err(|e| {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            "TYPST_NOT_FOUND".to_string()
+        } else {
+            e.to_string()
+        }
+    })?;
+
+    if !output.status.success() {
+        let err_msg = String::from_utf8_lossy(&output.stderr).to_string();
+        return Err(if err_msg.trim().is_empty() {
+            format!("typst compile failed with status {}", output.status)
+        } else {
+            err_msg
+        });
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -108,5 +180,26 @@ mod tests {
         // Clean up permissions so tempdir can be deleted
         perms.set_readonly(false);
         let _ = fs::set_permissions(&file_path, perms);
+    }
+
+    #[test]
+    fn test_export_args() {
+        let a = export_args(
+            Path::new(r"D:\งาน\my doc.typ"),
+            Path::new(r"D:\out\x.pdf"),
+            Path::new(r"D:\งาน"),
+            None,
+        );
+        assert_eq!(
+            a,
+            ["compile", r"D:\งาน\my doc.typ", r"D:\out\x.pdf", "--root", r"D:\งาน"].map(OsString::from)
+        );
+        let b = export_args(
+            Path::new("m.typ"),
+            Path::new("o.pdf"),
+            Path::new("."),
+            Some(Path::new("fonts")),
+        );
+        assert_eq!(&b[5..], ["--font-path", "fonts"].map(OsString::from));
     }
 }

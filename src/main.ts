@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { open as openDialog, ask } from "@tauri-apps/plugin-dialog";
+import { open as openDialog, save as saveDialog, ask } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { connectLsp, LspConnection } from "./lsp";
@@ -30,7 +30,7 @@ export function getSaver(): Saver | null {
   return saver;
 }
 
-function showBanner(message: string, isError = true) {
+export function showBanner(message: string, isError = true) {
   const banner = document.getElementById("banner");
   const bannerText = document.getElementById("banner-text");
   if (!banner || !bannerText) return;
@@ -108,6 +108,44 @@ function initSplitter() {
   splitter.addEventListener("pointercancel", stopDrag);
 }
 
+export async function exportPdf() {
+  if (!currentFilePath) return;
+
+  if (saver) {
+    try {
+      await saver.saveNow();
+    } catch (e: any) {
+      showBanner(`Save failed before export: ${e?.message || e}`);
+      return;
+    }
+  }
+
+  const defaultPdfPath = currentFilePath.replace(/\.[^/\\.]+$/, "") + ".pdf";
+  const outPath = await saveDialog({
+    defaultPath: defaultPdfPath,
+    filters: [{ name: "PDF Document", extensions: ["pdf"] }],
+  });
+
+  if (!outPath || typeof outPath !== "string") return;
+
+  const statusState = document.getElementById("status-state");
+  try {
+    await invoke("export_pdf", { main: currentFilePath, out: outPath });
+    hideBanner();
+    const pdfName = outPath.split(/[\\/]/).pop() || outPath;
+    if (statusState) {
+      statusState.textContent = `Exported ${pdfName}`;
+    }
+  } catch (err: any) {
+    const msg = String(err);
+    if (msg.includes("TYPST_NOT_FOUND")) {
+      showBanner("Typst was not found. Install it (winget install Typst.Typst) and restart the app.");
+    } else {
+      showBanner(`Export failed: ${msg}`);
+    }
+  }
+}
+
 export async function openFile(filePath?: string) {
   let targetPath = filePath;
   if (!targetPath) {
@@ -119,7 +157,6 @@ export async function openFile(filePath?: string) {
     targetPath = selected;
   }
 
-  // If dirty, save current before switching
   if (saver && saver.isDirty()) {
     try {
       await saver.saveNow();
@@ -212,6 +249,13 @@ window.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  const btnExport = document.getElementById("btn-export");
+  if (btnExport) {
+    btnExport.addEventListener("click", () => {
+      exportPdf().catch(console.error);
+    });
+  }
+
   window.addEventListener("keydown", (e) => {
     if (e.ctrlKey && e.key.toLowerCase() === "o") {
       e.preventDefault();
@@ -223,6 +267,9 @@ window.addEventListener("DOMContentLoaded", async () => {
           showBanner(`Save failed: ${err?.message || err}`);
         });
       }
+    } else if (e.ctrlKey && e.key.toLowerCase() === "e") {
+      e.preventDefault();
+      exportPdf().catch(console.error);
     }
   });
 
@@ -233,7 +280,6 @@ window.addEventListener("DOMContentLoaded", async () => {
         try {
           await saver.saveNow();
         } catch {
-          // save failed, ask confirmation
           const shouldClose = await ask(
             "Could not save changes. Close without saving?",
             { title: "Typst-Editor by Kong", kind: "warning" },
