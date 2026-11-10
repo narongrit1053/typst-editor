@@ -43,7 +43,15 @@ export function showQuickOpen(files: string[], onSelect: (path: string) => void)
       }
 
       const baseName = file.split(/[\\/]/).pop() || file;
-      item.innerHTML = `<span><strong>${baseName}</strong></span><small style="color:var(--muted)">${file}</small>`;
+      const span = document.createElement("span");
+      const strong = document.createElement("strong");
+      strong.textContent = baseName;
+      span.appendChild(strong);
+      const small = document.createElement("small");
+      small.style.color = "var(--muted)";
+      small.textContent = file;
+      item.appendChild(span);
+      item.appendChild(small);
 
       item.addEventListener("click", () => {
         close();

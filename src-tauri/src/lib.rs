@@ -35,7 +35,6 @@ pub fn run() {
             commands::delete_path,
             commands::load_app_settings,
             commands::save_app_settings,
-            commands::export_pdf,
             commands::export_file,
             commands::check_typst,
             commands::check_app_update,

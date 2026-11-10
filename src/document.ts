@@ -60,6 +60,7 @@ export function createSaver(opts: SaverOptions): Saver {
       inFlight = false;
       dirty = true;
       opts.onState("error", e?.message || String(e));
+      throw e;
     }
   }
 

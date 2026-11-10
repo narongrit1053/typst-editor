@@ -174,6 +174,7 @@ export function createEditor(parent: HTMLElement, lsp: LspConnection | null): Ed
     },
 
     onChange(cb: () => void) {
+      changeCallbacks.length = 0;
       changeCallbacks.push(cb);
     },
 

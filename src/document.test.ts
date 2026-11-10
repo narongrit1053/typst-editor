@@ -120,6 +120,9 @@ describe("createSaver", () => {
     expect(states[states.length - 1]).toBe("error");
     expect(saver.isDirty()).toBe(true);
 
+    // saveNow should throw while failing
+    await expect(saver.saveNow()).rejects.toThrow("Disk read-only");
+
     shouldFail = false;
     await saver.saveNow();
 

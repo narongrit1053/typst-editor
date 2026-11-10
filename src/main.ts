@@ -38,6 +38,7 @@ let outlineTimer: any = null;
 let lastRestartTime = 0;
 let isReconnecting = false;
 let flatWorkspaceFiles: string[] = [];
+let lastSavedDiskContent: string | null = null;
 
 export function getCurrentFilePath(): string | null {
   return currentFilePath;
@@ -605,20 +606,40 @@ export async function openFolder(folderPath?: string) {
     updateFileNameDisplay(null, false);
     const editorEl = document.getElementById("editor");
     if (editorEl) {
+      editorEl.replaceChildren();
       const folderName = targetFolder.split(/[\\/]/).pop() || targetFolder;
-      editorEl.innerHTML = `
-        <div class="editor-welcome">
-          <h2 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 600;">Folder Opened</h2>
-          <p style="color: var(--muted); margin: 0 0 16px 0; font-size: 13.5px;">${folderName}</p>
-          <p style="color: var(--muted); margin: 0 0 20px 0; font-size: 13px;">No .typ file selected. Choose a file from the sidebar or create a new file.</p>
-          <div style="display: flex; gap: 10px; justify-content: center;">
-            <button id="folder-new-file-btn" class="btn btn-primary">+ New Typst File</button>
-          </div>
-        </div>
-      `;
-      document.getElementById("folder-new-file-btn")?.addEventListener("click", () => {
+      const welcome = document.createElement("div");
+      welcome.className = "editor-welcome";
+
+      const h2 = document.createElement("h2");
+      h2.style.cssText = "margin: 0 0 8px 0; font-size: 18px; font-weight: 600;";
+      h2.textContent = "Folder Opened";
+
+      const pFolder = document.createElement("p");
+      pFolder.style.cssText = "color: var(--muted); margin: 0 0 16px 0; font-size: 13.5px;";
+      pFolder.textContent = folderName;
+
+      const pInfo = document.createElement("p");
+      pInfo.style.cssText = "color: var(--muted); margin: 0 0 20px 0; font-size: 13px;";
+      pInfo.textContent = "No .typ file selected. Choose a file from the sidebar or create a new file.";
+
+      const actionsDiv = document.createElement("div");
+      actionsDiv.style.cssText = "display: flex; gap: 10px; justify-content: center;";
+
+      const btn = document.createElement("button");
+      btn.id = "folder-new-file-btn";
+      btn.className = "btn btn-primary";
+      btn.textContent = "+ New Typst File";
+      btn.addEventListener("click", () => {
         createNewFile().catch(console.error);
       });
+
+      actionsDiv.appendChild(btn);
+      welcome.appendChild(h2);
+      welcome.appendChild(pFolder);
+      welcome.appendChild(pInfo);
+      welcome.appendChild(actionsDiv);
+      editorEl.appendChild(welcome);
     }
   }
 }
@@ -701,6 +722,7 @@ export async function openFile(filePath?: string) {
     const content = await invoke<string>("read_file", { path: targetPath });
     currentFilePath = targetPath;
     currentEol = detectEol(content);
+    lastSavedDiskContent = content;
 
     const settings = getCachedSettings();
 
@@ -710,6 +732,7 @@ export async function openFile(filePath?: string) {
         if (!currentFilePath) return;
         const normalized = withEol(text, currentEol);
         await invoke("write_file", { path: currentFilePath, contents: normalized });
+        lastSavedDiskContent = normalized;
       },
       onState: (state, err) => {
         if (state === "saved") {
@@ -756,9 +779,10 @@ async function handleExternalFileChange() {
   try {
     const diskContent = await invoke<string>("read_file", { path: currentFilePath });
     const currentText = editor.getText();
-    if (diskContent === currentText) return;
+    if (diskContent === currentText || diskContent === lastSavedDiskContent) return;
 
     if (saver && !saver.isDirty()) {
+      lastSavedDiskContent = diskContent;
       editor.open(currentFilePath, diskContent);
       scheduleOutlineRefresh();
     } else if (saver && saver.isDirty()) {
@@ -767,6 +791,7 @@ async function handleExternalFileChange() {
         { title: "Typst-Editor by Kong", kind: "warning" },
       );
       if (reload) {
+        lastSavedDiskContent = diskContent;
         editor.open(currentFilePath, diskContent);
         saver.saveNow().catch(() => {});
         scheduleOutlineRefresh();
@@ -974,20 +999,24 @@ function initApp() {
     const appWindow = getCurrentWindow();
     appWindow.onCloseRequested(async (event) => {
       if (saver && saver.isDirty()) {
+        event.preventDefault();
         try {
           await saver.saveNow();
+          await stopPreview();
+          await appWindow.destroy();
         } catch {
           const shouldClose = await ask(
             "Could not save changes. Close without saving?",
             { title: "Typst-Editor by Kong", kind: "warning" },
           );
-          if (!shouldClose) {
-            event.preventDefault();
-            return;
+          if (shouldClose) {
+            await stopPreview();
+            await appWindow.destroy();
           }
         }
+      } else {
+        stopPreview().catch(() => {});
       }
-      stopPreview().catch(() => {});
     }).catch(console.warn);
   } catch (e) {
     console.warn("Could not register window close listener:", e);

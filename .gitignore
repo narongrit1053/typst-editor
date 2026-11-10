@@ -4,3 +4,5 @@ target/
 tools/*.exe
 spike/
 .superpowers/
+.tauri/
+*.key

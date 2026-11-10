@@ -74,8 +74,16 @@ export async function connectLsp(rootPath: string, onExit: () => void): Promise<
     } catch {}
   };
 
+  function rejectPending(reason: string) {
+    for (const [, req] of pendingRequests) {
+      req.reject(new Error(reason));
+    }
+    pendingRequests.clear();
+  }
+
   let unlistenExit: UnlistenFn | null = null;
   unlistenExit = await listen("lsp-exit", () => {
+    rejectPending("LSP process exited");
     onExit();
   });
 
@@ -136,6 +144,7 @@ export async function connectLsp(rootPath: string, onExit: () => void): Promise<
         unlistenExit();
         unlistenExit = null;
       }
+      rejectPending("LSP connection closed");
       invoke("lsp_stop").catch(() => {});
     },
   };

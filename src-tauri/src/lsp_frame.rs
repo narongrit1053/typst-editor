@@ -40,6 +40,13 @@ pub fn read_message<R: BufRead>(r: &mut R) -> io::Result<Option<String>> {
         io::Error::new(io::ErrorKind::InvalidData, "Missing Content-Length header")
     })?;
 
+    if len > 64 * 1024 * 1024 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "Content-Length exceeds 64MB limit",
+        ));
+    }
+
     let mut body_buf = vec![0u8; len];
     r.read_exact(&mut body_buf)?;
 
@@ -94,6 +101,12 @@ mod tests {
     #[test]
     fn missing_length_is_an_error() {
         let mut r = Cursor::new(b"Content-Type: x\r\n\r\n{}".to_vec());
+        assert!(read_message(&mut r).is_err());
+    }
+
+    #[test]
+    fn oversized_length_is_rejected() {
+        let mut r = Cursor::new(b"Content-Length: 100000000\r\n\r\n{}".to_vec());
         assert!(read_message(&mut r).is_err());
     }
 }

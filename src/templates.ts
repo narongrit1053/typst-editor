@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { extractDialogPath } from "./main";
+import { getCachedSettings } from "./settings";
 
 export interface TypstTemplate {
   name: string;
@@ -256,12 +258,13 @@ function renderGrid(onOpenProject: (path: string) => void, query: string) {
 }
 
 async function instantiateTemplate(t: TypstTemplate, onOpenProject: (path: string) => void) {
-  const destDir = await openDialog({
+  const selected = await openDialog({
     directory: true,
     title: `Select destination directory for "${t.name}"`,
   });
 
-  if (!destDir || typeof destDir !== "string") return;
+  const destDir = extractDialogPath(selected);
+  if (!destDir) return;
 
   try {
     if (t.isLocal) {
@@ -270,9 +273,11 @@ async function instantiateTemplate(t: TypstTemplate, onOpenProject: (path: strin
         targetDir: destDir,
       });
     } else {
+      const settings = getCachedSettings();
       await invoke("create_from_template", {
         targetDir: destDir,
         packageSpec: `@preview/${t.name}:${t.version}`,
+        customBinary: settings.customTypstPath || null,
       });
     }
 

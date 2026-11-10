@@ -28,10 +28,23 @@ pub fn resolve_inside(root: &Path, candidate: &Path) -> Result<PathBuf, String> 
     let can_canon = if full_cand.exists() {
         fs::canonicalize(&full_cand).map_err(|e| e.to_string())?
     } else {
-        let parent = full_cand.parent().ok_or_else(|| "OUTSIDE_ROOT".to_string())?;
-        let parent_canon = fs::canonicalize(parent).map_err(|_| "OUTSIDE_ROOT".to_string())?;
-        let file_name = full_cand.file_name().ok_or_else(|| "OUTSIDE_ROOT".to_string())?;
-        parent_canon.join(file_name)
+        // Walk up to find nearest existing directory
+        let mut curr = full_cand.as_path();
+        let mut parts = Vec::new();
+        while !curr.exists() {
+            if let Some(name) = curr.file_name() {
+                parts.push(name.to_os_string());
+            }
+            match curr.parent() {
+                Some(p) => curr = p,
+                None => return Err("OUTSIDE_ROOT".to_string()),
+            }
+        }
+        let mut canon = fs::canonicalize(curr).map_err(|_| "OUTSIDE_ROOT".to_string())?;
+        for p in parts.into_iter().rev() {
+            canon.push(p);
+        }
+        canon
     };
 
     if can_canon.starts_with(&root_canon) {
@@ -280,6 +293,9 @@ pub fn check_app_update(custom_endpoint: Option<String>) -> Result<UpdateInfo, S
 
 #[tauri::command]
 pub fn download_and_launch_installer(url: String) -> Result<(), String> {
+    if !url.starts_with("https://github.com/kong/typst-editor/releases/download/") || !url.ends_with(".exe") {
+        return Err("UNTRUSTED_DOWNLOAD_URL".to_string());
+    }
     let temp_dir = std::env::temp_dir();
     let installer_path = temp_dir.join("typst-editor-setup.exe");
 
@@ -343,13 +359,18 @@ pub fn fetch_template_catalog(app: AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn create_from_template(target_dir: String, package_spec: String) -> Result<(), String> {
+pub fn create_from_template(
+    target_dir: String,
+    package_spec: String,
+    custom_binary: Option<String>,
+) -> Result<(), String> {
     let target = PathBuf::from(&target_dir);
     if !target.exists() {
         fs::create_dir_all(&target).map_err(|e| e.to_string())?;
     }
 
-    let mut cmd = Command::new("typst");
+    let bin = custom_binary.filter(|s| !s.trim().is_empty()).unwrap_or_else(|| "typst".to_string());
+    let mut cmd = Command::new(&bin);
     cmd.arg("init").arg(&package_spec).arg(&target_dir);
 
     #[cfg(windows)]
@@ -539,10 +560,6 @@ pub fn export_file(
     Ok(())
 }
 
-#[tauri::command]
-pub fn export_pdf(state: State<'_, AppState>, main: String, out: String) -> Result<(), String> {
-    export_file(state, main, out, None)
-}
 
 #[cfg(test)]
 mod tests {
@@ -564,8 +581,21 @@ mod tests {
         assert!(resolve_inside(&proj, &proj.join("new.typ")).is_ok());
         assert!(resolve_inside(&proj, Path::new("sub/a.typ")).is_ok());
         assert!(resolve_inside(&proj, Path::new("new.typ")).is_ok());
+        assert!(resolve_inside(&proj, Path::new("nested/deep/new.typ")).is_ok());
         assert_eq!(resolve_inside(&proj, &proj.join("../proj2/b.typ")), Err("OUTSIDE_ROOT".into()));
         assert_eq!(resolve_inside(&proj, &proj2.join("b.typ")), Err("OUTSIDE_ROOT".into()));
+    }
+
+    #[test]
+    fn test_download_installer_url_validation() {
+        assert_eq!(
+            download_and_launch_installer("http://malicious.com/setup.exe".into()),
+            Err("UNTRUSTED_DOWNLOAD_URL".into())
+        );
+        assert_eq!(
+            download_and_launch_installer("https://github.com/other/repo/releases/download/v1/setup.exe".into()),
+            Err("UNTRUSTED_DOWNLOAD_URL".into())
+        );
     }
 
     #[test]
