@@ -4,6 +4,7 @@ export interface AppSettings {
   theme: "light" | "dark" | "system";
   fontSize: number;
   autosave: boolean;
+  wordWrap: boolean;
   recentFolders: string[];
   mainPins: Record<string, string>;
   customTypstPath?: string;
@@ -13,6 +14,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: "system",
   fontSize: 13.5,
   autosave: true,
+  wordWrap: true,
   recentFolders: [],
   mainPins: {},
   customTypstPath: "",
@@ -28,6 +30,7 @@ export function mergeSettings(jsonStr: string): AppSettings {
           ? parsed.fontSize
           : DEFAULT_SETTINGS.fontSize,
       autosave: typeof parsed.autosave === "boolean" ? parsed.autosave : DEFAULT_SETTINGS.autosave,
+      wordWrap: typeof parsed.wordWrap === "boolean" ? parsed.wordWrap : DEFAULT_SETTINGS.wordWrap,
       recentFolders: Array.isArray(parsed.recentFolders) ? parsed.recentFolders : DEFAULT_SETTINGS.recentFolders,
       mainPins:
         typeof parsed.mainPins === "object" && parsed.mainPins !== null
@@ -104,7 +107,7 @@ export async function checkForUpdates(quiet = false): Promise<UpdateInfo | null>
   }
 }
 
-export function initSettingsModal(): void {
+export function initSettingsModal(onSave?: (settings: AppSettings) => void): void {
   const modal = document.getElementById("modal-settings");
   const btnSettings = document.getElementById("btn-settings");
   const btnCancel = document.getElementById("btn-settings-cancel");
@@ -115,6 +118,7 @@ export function initSettingsModal(): void {
   const selectTheme = document.getElementById("setting-theme") as HTMLSelectElement | null;
   const inputFontSize = document.getElementById("setting-fontsize") as HTMLInputElement | null;
   const checkAutosave = document.getElementById("setting-autosave") as HTMLInputElement | null;
+  const checkWordWrap = document.getElementById("setting-wordwrap") as HTMLInputElement | null;
   const inputTypstPath = document.getElementById("setting-typst-path") as HTMLInputElement | null;
 
   if (!modal || !btnSettings || !btnCancel || !btnSave) return;
@@ -123,6 +127,7 @@ export function initSettingsModal(): void {
     if (selectTheme) selectTheme.value = cachedSettings.theme;
     if (inputFontSize) inputFontSize.value = String(cachedSettings.fontSize);
     if (checkAutosave) checkAutosave.checked = cachedSettings.autosave;
+    if (checkWordWrap) checkWordWrap.checked = cachedSettings.wordWrap;
     if (inputTypstPath) inputTypstPath.value = cachedSettings.customTypstPath || "";
     modal.classList.remove("hidden");
   });
@@ -159,15 +164,19 @@ export function initSettingsModal(): void {
     const theme = (selectTheme?.value as "light" | "dark" | "system") || "system";
     const fontSize = parseFloat(inputFontSize?.value || "13.5") || 13.5;
     const autosave = checkAutosave ? checkAutosave.checked : true;
+    const wordWrap = checkWordWrap ? checkWordWrap.checked : true;
     const customTypstPath = inputTypstPath?.value.trim() || "";
 
-    await saveSettings({
+    const newSettings: AppSettings = {
       ...cachedSettings,
       theme,
       fontSize,
       autosave,
+      wordWrap,
       customTypstPath,
-    });
+    };
+    await saveSettings(newSettings);
+    onSave?.(newSettings);
     modal.classList.add("hidden");
   });
 }

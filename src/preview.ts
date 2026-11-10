@@ -99,17 +99,24 @@ export async function startPreview(
   frame: HTMLIFrameElement,
   lsp: LspConnection,
   mainPath: string,
+  fontPath?: string,
 ): Promise<void> {
   await stopPreview(activeLsp || lsp);
   activeLsp = lsp;
 
   try {
+    const previewArgs = ["--no-open", "--data-plane-host", "127.0.0.1:0"];
+    if (fontPath) {
+      previewArgs.push("--font-path", fontPath);
+    }
+    previewArgs.push(mainPath);
+
     let res: PreviewStartResult | undefined;
     for (let attempt = 0; attempt < 25; attempt++) {
       try {
         res = (await lsp.request("workspace/executeCommand", {
           command: "tinymist.doStartPreview",
-          arguments: [["--no-open", "--data-plane-host", "127.0.0.1:0", mainPath]],
+          arguments: [previewArgs],
         })) as PreviewStartResult | undefined;
         break;
       } catch (err: any) {

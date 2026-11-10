@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { detectEol, withEol, createSaver } from "./document";
+import { fixRawTextWhitespace } from "./editor";
 
 describe("detectEol and withEol", () => {
   it("detects CRLF or LF properly", () => {
@@ -143,5 +144,16 @@ describe("createSaver", () => {
     await saver.saveNow();
     expect(written).toEqual([]);
     expect(saver.isDirty()).toBe(false);
+  });
+
+  it("fixes raw text whitespace after initial backticks", () => {
+    const rawNoSpace = '#let svg = ```<svg>data</svg>```.text';
+    expect(fixRawTextWhitespace(rawNoSpace)).toBe('#let svg = ``` <svg>data</svg>```.text');
+
+    const multiLineCode = '```python\nprint(123)\n```';
+    expect(fixRawTextWhitespace(multiLineCode)).toBe(multiLineCode);
+
+    const alreadySpaced = '``` <svg>data</svg>```';
+    expect(fixRawTextWhitespace(alreadySpaced)).toBe(alreadySpaced);
   });
 });

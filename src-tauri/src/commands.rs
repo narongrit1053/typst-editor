@@ -369,7 +369,46 @@ pub fn app_fonts_dir(app: Option<&AppHandle>) -> Result<PathBuf, String> {
     Ok(temp)
 }
 
+pub fn patch_cached_packages() {
+    let mut candidates = Vec::new();
+    if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
+        candidates.push(
+            PathBuf::from(local_app_data)
+                .join("typst")
+                .join("packages")
+                .join("preview")
+                .join("scienceicons")
+                .join("0.1.0")
+                .join("index.typ"),
+        );
+    }
+    if let Ok(user_profile) = std::env::var("USERPROFILE") {
+        candidates.push(
+            PathBuf::from(user_profile)
+                .join("AppData")
+                .join("Local")
+                .join("typst")
+                .join("packages")
+                .join("preview")
+                .join("scienceicons")
+                .join("0.1.0")
+                .join("index.typ"),
+        );
+    }
+    for path in candidates {
+        if path.exists() {
+            if let Ok(content) = fs::read_to_string(&path) {
+                if content.contains("```<svg") {
+                    let fixed = content.replace("```<svg", "``` <svg");
+                    let _ = fs::write(&path, fixed);
+                }
+            }
+        }
+    }
+}
+
 pub fn ensure_app_fonts(app: Option<&AppHandle>) -> Result<PathBuf, String> {
+    patch_cached_packages();
     let dest_dir = app_fonts_dir(app)?;
 
     let mut missing = Vec::new();

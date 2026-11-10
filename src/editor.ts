@@ -9,7 +9,7 @@ import {
   rectangularSelection,
   crosshairCursor,
 } from "@codemirror/view";
-import { EditorState } from "@codemirror/state";
+import { EditorState, Compartment } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { autocompletion, completionKeymap, closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
@@ -27,6 +27,10 @@ import {
 
 import { LspConnection, pathToUri, uriToPath } from "./lsp";
 
+export function fixRawTextWhitespace(text: string): string {
+  return text.replace(/(^|[^`])```([^\s\n`][^`\n]*```)/g, "$1``` $2");
+}
+
 export interface Problem {
   path: string;
   line: number;
@@ -41,17 +45,33 @@ export interface EditorHandle {
   format(): boolean;
   onChange(cb: () => void): void;
   onCursor(cb: (line: number, col: number) => void): void;
+  onDoubleClick(cb: (line: number, col: number) => void): void;
   jumpTo(line: number, col: number): void;
   jumpToRange(startLine: number, startCol: number, endLine?: number, endCol?: number): void;
+  setWordWrap(enabled: boolean): void;
+  setTheme(dark: boolean): void;
   onDiagnostics(cb: (d: Problem[]) => void): void;
   destroy(): void;
 }
 
-export function createEditor(parent: HTMLElement, lsp: LspConnection | null): EditorHandle {
+export function createEditor(
+  parent: HTMLElement,
+  lsp: LspConnection | null,
+  initialWordWrap = true,
+): EditorHandle {
   let lspClient: any = null;
   let view: EditorView | null = null;
+  const wrapCompartment = new Compartment();
+  const themeCompartment = new Compartment();
+  const isDarkInitial =
+    typeof document !== "undefined" &&
+    (document.documentElement.dataset.theme === "dark" ||
+      (!document.documentElement.dataset.theme &&
+        typeof window !== "undefined" &&
+        window.matchMedia?.("(prefers-color-scheme: dark)").matches));
   const changeCallbacks: (() => void)[] = [];
   const cursorCallbacks: ((line: number, col: number) => void)[] = [];
+  const doubleClickCallbacks: ((line: number, col: number) => void)[] = [];
   const diagnosticsCallbacks: ((d: Problem[]) => void)[] = [];
 
   if (lsp) {
@@ -108,6 +128,8 @@ export function createEditor(parent: HTMLElement, lsp: LspConnection | null): Ed
 
   function buildExtensions(fileUri: string) {
     const exts = [
+      wrapCompartment.of(initialWordWrap ? EditorView.lineWrapping : []),
+      themeCompartment.of(EditorView.theme({}, { dark: isDarkInitial })),
       lineNumbers(),
       highlightActiveLineGutter(),
       history(),
@@ -123,6 +145,20 @@ export function createEditor(parent: HTMLElement, lsp: LspConnection | null): Ed
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
       typst(),
       updateListener,
+      EditorView.domEventHandlers({
+        dblclick: (event, targetView) => {
+          const pos = targetView.posAtCoords({ x: event.clientX, y: event.clientY });
+          if (pos !== null) {
+            const lineObj = targetView.state.doc.lineAt(pos);
+            const lineNum = lineObj.number;
+            const colNum = pos - lineObj.from + 1;
+            for (const cb of doubleClickCallbacks) {
+              cb(lineNum, colNum);
+            }
+          }
+          return false;
+        },
+      }),
       f12Keymap,
       keymap.of([
         ...formatKeymap,
@@ -171,7 +207,15 @@ export function createEditor(parent: HTMLElement, lsp: LspConnection | null): Ed
 
     format(): boolean {
       if (!view) return false;
-      return formatDocument(view);
+      const formatted = formatDocument(view);
+      const text = view.state.doc.toString();
+      const fixed = fixRawTextWhitespace(text);
+      if (fixed !== text) {
+        view.dispatch({
+          changes: { from: 0, to: view.state.doc.length, insert: fixed },
+        });
+      }
+      return formatted;
     },
 
     onChange(cb: () => void) {
@@ -181,6 +225,24 @@ export function createEditor(parent: HTMLElement, lsp: LspConnection | null): Ed
 
     onCursor(cb: (line: number, col: number) => void) {
       cursorCallbacks.push(cb);
+    },
+
+    onDoubleClick(cb: (line: number, col: number) => void) {
+      doubleClickCallbacks.push(cb);
+    },
+
+    setWordWrap(enabled: boolean) {
+      if (!view) return;
+      view.dispatch({
+        effects: wrapCompartment.reconfigure(enabled ? EditorView.lineWrapping : []),
+      });
+    },
+
+    setTheme(dark: boolean) {
+      if (!view) return;
+      view.dispatch({
+        effects: themeCompartment.reconfigure(EditorView.theme({}, { dark })),
+      });
     },
 
     jumpToRange(startLine: number, startCol: number, endLine?: number, endCol?: number) {

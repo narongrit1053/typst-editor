@@ -6,11 +6,13 @@ describe("Settings logic", () => {
     const partial: Partial<AppSettings> = {
       theme: "dark",
       fontSize: 16,
+      wordWrap: false,
     };
     const merged = mergeSettings(JSON.stringify(partial));
     expect(merged.theme).toBe("dark");
     expect(merged.fontSize).toBe(16);
     expect(merged.autosave).toBe(true);
+    expect(merged.wordWrap).toBe(false);
     expect(merged.recentFolders).toEqual([]);
     expect(merged.mainPins).toEqual({});
   });

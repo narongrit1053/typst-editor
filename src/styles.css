@@ -509,34 +509,52 @@ html, body {
 }
 
 /* CodeMirror autocomplete & tooltips */
-.cm-tooltip {
+.cm-tooltip,
+.cm-editor .cm-tooltip,
+.cm-tooltip-autocomplete,
+.cm-editor .cm-tooltip-autocomplete {
   background: var(--panel) !important;
   color: var(--ink) !important;
   border: 1px solid var(--line) !important;
   border-radius: 6px !important;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
   font-family: "Cascadia Code", Consolas, monospace !important;
 }
 
-.cm-tooltip-autocomplete {
+.cm-tooltip-autocomplete ul,
+.cm-editor .cm-tooltip-autocomplete ul {
   background: var(--panel) !important;
-  border: 1px solid var(--line) !important;
-}
-
-.cm-tooltip-autocomplete ul {
+  color: var(--ink) !important;
   font-family: "Cascadia Code", Consolas, monospace !important;
   font-size: var(--editor-font-size, 13px) !important;
   padding: 3px 0 !important;
 }
 
-.cm-tooltip-autocomplete ul li {
+.cm-tooltip-autocomplete ul li,
+.cm-editor .cm-tooltip-autocomplete ul li {
+  background: var(--panel) !important;
   color: var(--ink) !important;
-  padding: 3px 8px !important;
+  padding: 4px 10px !important;
   line-height: 1.4 !important;
 }
 
-.cm-tooltip-autocomplete ul li[aria-selected] {
+.cm-tooltip-autocomplete ul li:hover,
+.cm-editor .cm-tooltip-autocomplete ul li:hover {
+  background: var(--accent-soft) !important;
+  color: var(--ink) !important;
+}
+
+.cm-tooltip-autocomplete ul li[aria-selected],
+.cm-editor .cm-tooltip-autocomplete ul li[aria-selected] {
   background: var(--accent) !important;
+  color: #ffffff !important;
+}
+
+.cm-completionLabel {
+  color: var(--ink) !important;
+}
+
+.cm-tooltip-autocomplete ul li[aria-selected] .cm-completionLabel {
   color: #ffffff !important;
 }
 
@@ -563,10 +581,11 @@ html, body {
 .cm-completionMatchedText {
   color: var(--accent) !important;
   text-decoration: underline;
-  font-weight: 600;
+  font-weight: 700;
 }
 
-.cm-tooltip.cm-completionInfo {
+.cm-tooltip.cm-completionInfo,
+.cm-editor .cm-tooltip.cm-completionInfo {
   background: var(--panel) !important;
   color: var(--ink) !important;
   border: 1px solid var(--line) !important;
@@ -574,6 +593,7 @@ html, body {
   padding: 8px 12px !important;
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif !important;
   font-size: 13px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
 }
 
 /* Modal styles */

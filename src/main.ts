@@ -39,6 +39,7 @@ let lastRestartTime = 0;
 let isReconnecting = false;
 let flatWorkspaceFiles: string[] = [];
 let lastSavedDiskContent: string | null = null;
+let appFontsDir: string | undefined;
 
 export function getCurrentFilePath(): string | null {
   return currentFilePath;
@@ -254,7 +255,7 @@ export async function setMainFile(path: string | null) {
   const previewFrame = document.getElementById("preview") as HTMLIFrameElement;
   const targetPreview = pinnedFilePath || currentFilePath;
   if (previewFrame && lspConnection && targetPreview) {
-    startPreview(previewFrame, lspConnection, targetPreview).catch((err) => {
+    startPreview(previewFrame, lspConnection, targetPreview, appFontsDir).catch((err) => {
       console.error("Preview start failed:", err);
       showBanner(`Preview error: ${err?.message || err}`, false);
     });
@@ -393,9 +394,22 @@ function syncPreviewToEditor(line: number, col: number) {
   }, 100);
 }
 
+let lastShowDocTime = 0;
+let lastShowDocUri = "";
+
 function setupLspHandlers(lsp: LspConnection) {
   lsp.onNotification("window/showDocument", (params: any) => {
     if (!params || !params.uri) return;
+    const now = Date.now();
+    const uriKey = `${params.uri}:${params.selection?.start?.line}:${params.selection?.start?.character}`;
+    if (now - lastShowDocTime > 400 || uriKey !== lastShowDocUri) {
+      lastShowDocTime = now;
+      lastShowDocUri = uriKey;
+      return;
+    }
+    lastShowDocTime = 0;
+    lastShowDocUri = "";
+
     const targetPath = uriToPath(params.uri);
     const start = params.selection?.start || { line: 0, character: 0 };
     const end = params.selection?.end || start;
@@ -458,12 +472,14 @@ async function reconnectLsp() {
       editor.destroy();
     }
 
-    editor = createEditor(editorEl, lspConnection);
+    editor = createEditor(editorEl, lspConnection, getCachedSettings().wordWrap);
     const statusPos = document.getElementById("status-pos");
     editor.onCursor((line, col) => {
       if (statusPos) {
         statusPos.textContent = `Ln ${line}, Col ${col}`;
       }
+    });
+    editor.onDoubleClick((line, col) => {
       syncPreviewToEditor(line, col);
     });
 
@@ -490,7 +506,7 @@ async function reconnectLsp() {
       const previewFrame = document.getElementById("preview") as HTMLIFrameElement;
       const targetPreview = pinnedFilePath || currentFilePath;
       if (previewFrame && lspConnection && targetPreview) {
-        await startPreview(previewFrame, lspConnection, targetPreview);
+        await startPreview(previewFrame, lspConnection, targetPreview, appFontsDir);
       }
       refreshOutline().catch(() => {});
     }
@@ -772,12 +788,14 @@ export async function openFile(filePath?: string) {
 
   const editorEl = document.getElementById("editor")!;
   if (!editor) {
-    editor = createEditor(editorEl, lspConnection);
+    editor = createEditor(editorEl, lspConnection, getCachedSettings().wordWrap);
     const statusPos = document.getElementById("status-pos");
     editor.onCursor((line, col) => {
       if (statusPos) {
         statusPos.textContent = `Ln ${line}, Col ${col}`;
       }
+    });
+    editor.onDoubleClick((line, col) => {
       syncPreviewToEditor(line, col);
     });
 
@@ -838,7 +856,7 @@ export async function openFile(filePath?: string) {
     const previewFrame = document.getElementById("preview") as HTMLIFrameElement;
     const targetPreview = pinnedFilePath || targetPath;
     if (previewFrame && lspConnection) {
-      startPreview(previewFrame, lspConnection, targetPreview).catch((err) => {
+      startPreview(previewFrame, lspConnection, targetPreview, appFontsDir).catch((err) => {
         console.error("Preview start failed:", err);
         showBanner(`Preview error: ${err?.message || err}`, false);
       });
@@ -888,7 +906,17 @@ function initApp() {
   console.log("Typst-Editor: wiring UI and event listeners...");
 
   initSplitter();
-  initSettingsModal();
+  invoke<string>("get_app_fonts_dir").then((dir) => {
+    appFontsDir = dir;
+  }).catch(() => {});
+
+  initSettingsModal((settings) => {
+    editor?.setWordWrap(settings.wordWrap);
+    const isDark =
+      settings.theme === "dark" ||
+      (settings.theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    editor?.setTheme(isDark);
+  });
 
   const bannerClose = document.getElementById("banner-close");
   bannerClose?.addEventListener("click", () => {
@@ -903,7 +931,19 @@ function initApp() {
   // Preview frame
   const previewFrame = document.getElementById("preview") as HTMLIFrameElement;
 
+  let lastPreviewSyncTime = 0;
+  let lastPreviewSyncLoc = "";
   initPreviewSync((file, line, col) => {
+    const now = Date.now();
+    const locKey = `${file}:${line}:${col}`;
+    if (now - lastPreviewSyncTime > 400 || locKey !== lastPreviewSyncLoc) {
+      lastPreviewSyncTime = now;
+      lastPreviewSyncLoc = locKey;
+      return;
+    }
+    lastPreviewSyncTime = 0;
+    lastPreviewSyncLoc = "";
+
     const normFile = normalizePath(file);
     const normCurrent = normalizePath(currentFilePath);
     if (normFile && normFile !== normCurrent) {
