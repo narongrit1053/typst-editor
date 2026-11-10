@@ -10,6 +10,7 @@ import {
   zoomIn,
   zoomOut,
   resetZoom,
+  setZoomLevel,
   initPreviewSync,
 } from "./preview";
 import { detectEol, withEol, createSaver, Saver } from "./document";
@@ -1035,6 +1036,12 @@ function initApp() {
       btnZoomReset.textContent = `${Math.round(z * 100)}%`;
     }
   };
+
+  window.addEventListener("message", (event) => {
+    if (event.origin.startsWith("http://127.0.0.1:") && event.data?.type === "kong-zoom-level") {
+      updateZoomLabel(setZoomLevel(Number(event.data.ratio) || 1));
+    }
+  });
 
   btnZoomIn?.addEventListener("click", () => {
     if (previewFrame) updateZoomLabel(zoomIn(previewFrame));

@@ -15,35 +15,33 @@ export function getZoom(): number {
   return currentZoom;
 }
 
-export function setZoom(frame: HTMLIFrameElement, zoom: number): number {
-  currentZoom = Math.max(0.5, Math.min(2.5, Math.round(zoom * 10) / 10));
-  if (frame && frame.style) {
-    if (currentZoom === 1.0) {
-      frame.style.transform = "";
-      frame.style.width = "100%";
-      frame.style.height = "100%";
-      frame.style.transformOrigin = "";
-    } else {
-      frame.style.transformOrigin = "top left";
-      frame.style.transform = `scale(${currentZoom})`;
-      frame.style.width = `${100 / currentZoom}%`;
-      frame.style.height = `${100 / currentZoom}%`;
-    }
-    (frame.style as any).zoom = "";
-  }
+// Zoom is done by Tinymist's own renderer: scaling the iframe with CSS does nothing visible because
+// the preview page re-fits the document to its own width. The injected script
+// (src-tauri/src/preview_flash.js) turns these messages into Tinymist's Ctrl+= / Ctrl+- zoom and
+// reports the real level back as a "kong-zoom-level" message (see setZoomLevel).
+function sendZoom(frame: HTMLIFrameElement, dir: "in" | "out"): number {
+  frame?.contentWindow?.postMessage({ type: "kong-zoom", dir }, "*");
+  return currentZoom;
+}
+
+export function setZoomLevel(ratio: number): number {
+  currentZoom = Math.round(ratio * 100) / 100;
   return currentZoom;
 }
 
 export function zoomIn(frame: HTMLIFrameElement): number {
-  return setZoom(frame, currentZoom + 0.1);
+  return sendZoom(frame, "in");
 }
 
 export function zoomOut(frame: HTMLIFrameElement): number {
-  return setZoom(frame, currentZoom - 0.1);
+  return sendZoom(frame, "out");
 }
 
+// Reloading the preview page brings it back to fit-to-width.
 export function resetZoom(frame: HTMLIFrameElement): number {
-  return setZoom(frame, 1.0);
+  currentZoom = 1.0;
+  if (frame?.src) frame.src = frame.src;
+  return currentZoom;
 }
 
 export function handlePreviewMessage(data: any, onJumpToSource?: (file: string, line: number, col: number) => void): boolean {
@@ -147,8 +145,8 @@ export async function startPreview(
     } else {
       frame.src = previewUrl;
     }
-    // Apply current zoom via GPU-accelerated transform
-    setZoom(frame, currentZoom);
+    // A freshly loaded preview page starts at fit-to-width.
+    currentZoom = 1.0;
   } catch (err) {
     console.error("Failed to start preview:", err);
     throw err;

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { zoomIn, zoomOut, resetZoom, getZoom, handlePreviewMessage, startPreview, stopPreview } from "./preview";
+import { zoomIn, zoomOut, resetZoom, getZoom, setZoomLevel, handlePreviewMessage, startPreview, stopPreview } from "./preview";
 import { LspConnection } from "./lsp";
 
 describe("preview zoom and controls", () => {
@@ -8,31 +8,22 @@ describe("preview zoom and controls", () => {
   beforeEach(() => {
     fakeFrame = {
       style: {} as any,
-      src: "",
-      contentWindow: {
-        location: { reload: vi.fn() },
-      },
+      src: "http://127.0.0.1:5000/",
+      contentWindow: { postMessage: vi.fn() },
     };
     resetZoom(fakeFrame);
   });
 
-  it("adjusts zoom in and out with bounds clamping", () => {
+  it("asks the preview page to zoom and tracks the level it reports", () => {
     expect(getZoom()).toBe(1.0);
 
     zoomIn(fakeFrame);
-    expect(getZoom()).toBe(1.1);
-    expect(fakeFrame.style.transform).toBe("scale(1.1)");
-
+    expect(fakeFrame.contentWindow.postMessage).toHaveBeenCalledWith({ type: "kong-zoom", dir: "in" }, "*");
     zoomOut(fakeFrame);
-    expect(getZoom()).toBe(1.0);
+    expect(fakeFrame.contentWindow.postMessage).toHaveBeenCalledWith({ type: "kong-zoom", dir: "out" }, "*");
 
-    // Clamps at minimum 0.5
-    for (let i = 0; i < 10; i++) zoomOut(fakeFrame);
-    expect(getZoom()).toBe(0.5);
-
-    // Clamps at maximum 2.5
-    for (let i = 0; i < 30; i++) zoomIn(fakeFrame);
-    expect(getZoom()).toBe(2.5);
+    expect(setZoomLevel(1.2999)).toBe(1.3);
+    expect(getZoom()).toBe(1.3);
 
     resetZoom(fakeFrame);
     expect(getZoom()).toBe(1.0);

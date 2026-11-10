@@ -8,6 +8,50 @@
   // double so it only moves the editor on a double-click.
   document.addEventListener("dblclick", () => parent.postMessage({ type: "kong-preview-dblclick" }, "*"), true);
 
+  // Zoom: the app's +/- buttons send "kong-zoom"; we trigger Tinymist's own Ctrl+= / Ctrl+- handler
+  // (listening on document.body) and report the real level back. The level is the document's
+  // rendered width relative to its width before the first zoom on this page load (fit-to-width).
+  let fitWidth = 0;
+  const docWidth = () => document.querySelector(".typst-doc")?.getBoundingClientRect().width || 0;
+  const captureFit = () => {
+    if (!fitWidth) fitWidth = docWidth();
+  };
+  const reportZoom = () =>
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const w = docWidth();
+        if (w && fitWidth) parent.postMessage({ type: "kong-zoom-level", ratio: w / fitWidth }, "*");
+      }),
+    );
+
+  window.addEventListener("message", (e) => {
+    if (e.source !== parent || e.data?.type !== "kong-zoom") return;
+    captureFit();
+    const key = e.data.dir === "in" ? "=" : "-";
+    document.body.dispatchEvent(new KeyboardEvent("keydown", { key, ctrlKey: true, bubbles: true }));
+    reportZoom();
+  });
+  // Ctrl+scroll and Ctrl+=/- inside the preview zoom natively; keep the app's label in sync.
+  // Capture phase runs before Tinymist's handlers, so fitWidth is taken before the first zoom.
+  document.addEventListener(
+    "wheel",
+    (e) => {
+      if (!e.ctrlKey) return;
+      captureFit();
+      reportZoom();
+    },
+    { capture: true, passive: true },
+  );
+  document.addEventListener(
+    "keydown",
+    (e) => {
+      if (!e.isTrusted || !e.ctrlKey || (e.key !== "=" && e.key !== "-")) return;
+      captureFit();
+      reportZoom();
+    },
+    true,
+  );
+
   const css = `
     .typst-jump-ripple { visibility: hidden !important; }
     .kong-flash {
