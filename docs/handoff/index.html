@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Typst-Editor by Kong — Timeline & Changelog Handoff</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --card: #21262d;
+      --card-hover: #262c36;
+      --ink: #f0f6fc;
+      --muted: #8b949e;
+      --line: #30363d;
+      --accent: #238636;
+      --accent-soft: rgba(35, 134, 54, 0.15);
+      --typst: #239dad;
+      --typst-soft: rgba(35, 157, 173, 0.15);
+      --warn: #d29922;
+      --warn-soft: rgba(210, 153, 34, 0.15);
+      --err: #f85149;
+      --err-soft: rgba(248, 81, 73, 0.15);
+      --code-bg: #11141a;
+      --font-mono: "Cascadia Code", "Fira Code", Consolas, monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+      --shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    [data-theme="light"] {
+      --bg: #f6f8fa;
+      --panel: #ffffff;
+      --card: #ffffff;
+      --card-hover: #f3f4f6;
+      --ink: #1f2328;
+      --muted: #656d76;
+      --line: #d0d7de;
+      --accent: #1a7f37;
+      --accent-soft: rgba(26, 127, 55, 0.12);
+      --typst: #1f7a8c;
+      --typst-soft: rgba(31, 122, 140, 0.12);
+      --warn: #9a6700;
+      --warn-soft: rgba(154, 103, 0, 0.12);
+      --err: #cf222e;
+      --err-soft: rgba(207, 34, 46, 0.12);
+      --code-bg: #f1f3f6;
+      --shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--font-sans);
+      font-size: 15px;
+      line-height: 1.6;
+      padding: 0;
+      margin: 0;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    /* Top Sticky Navigation */
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(10px);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--ink);
+      text-decoration: none;
+    }
+    .brand-badge {
+      font-size: 0.72rem;
+      background: var(--typst);
+      color: #fff;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+    .nav-links {
+      display: flex;
+      gap: 18px;
+      font-size: 0.92rem;
+      align-items: center;
+    }
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .nav-links a:hover {
+      color: var(--typst);
+    }
+    .theme-toggle-btn {
+      background: var(--card);
+      border: 1px solid var(--line);
+      color: var(--ink);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .theme-toggle-btn:hover {
+      background: var(--card-hover);
+      border-color: var(--muted);
+    }
+
+    /* Main Container */
+    .container {
+      max-width: 1140px;
+      margin: 0 auto;
+      padding: 40px 24px 100px;
+    }
+
+    /* Hero */
+    .hero {
+      text-align: center;
+      padding: 40px 0 50px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 40px;
+    }
+    .hero h1 {
+      font-size: 2.6rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 14px;
+      background: linear-gradient(135deg, var(--ink) 30%, var(--typst) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero p {
+      color: var(--muted);
+      font-size: 1.15rem;
+      max-width: 760px;
+      margin: 0 auto 24px;
+    }
+    .badge-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+    }
+    .pill {
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 99px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--ink);
+    }
+    .pill.success {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .pill.typst {
+      background: var(--typst-soft);
+      border-color: var(--typst);
+      color: var(--typst);
+    }
+
+    /* Metric Cards */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 48px;
+    }
+    .metric-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: var(--shadow);
+    }
+    .metric-card .num {
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: var(--typst);
+      line-height: 1.1;
+      margin-bottom: 4px;
+    }
+    .metric-card .label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .metric-card .desc {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    /* Section Headings */
+    .section-title {
+      font-size: 1.7rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin: 56px 0 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 12px;
+    }
+    .section-subtitle {
+      color: var(--muted);
+      font-size: 1rem;
+      margin: -10px 0 24px;
+    }
+
+    /* Architecture Block Diagram */
+    .arch-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 40px;
+      box-shadow: var(--shadow);
+    }
+    .diagram-container {
+      background: var(--code-bg);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 20px;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 0.84rem;
+      line-height: 1.45;
+      color: var(--ink);
+      white-space: pre;
+    }
+
+    /* Interactive Timeline */
+    .timeline {
+      position: relative;
+      padding: 20px 0;
+    }
+    .timeline::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 20px;
+      width: 2px;
+      background: var(--line);
+    }
+    .timeline-item {
+      position: relative;
+      margin-left: 56px;
+      margin-bottom: 36px;
+    }
+    .timeline-dot {
+      position: absolute;
+      left: -46px;
+      top: 8px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--panel);
+      border: 3px solid var(--typst);
+      box-shadow: 0 0 0 4px var(--bg);
+      transition: transform 0.2s, background 0.2s;
+    }
+    .timeline-item:hover .timeline-dot {
+      transform: scale(1.2);
+      background: var(--typst);
+    }
+    .timeline-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 24px;
+      box-shadow: var(--shadow);
+      transition: border-color 0.2s;
+    }
+    .timeline-card:hover {
+      border-color: var(--typst);
+    }
+    .timeline-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .timeline-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .timeline-date {
+      font-size: 0.82rem;
+      font-family: var(--font-mono);
+      color: var(--muted);
+      background: var(--card);
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+    .timeline-desc {
+      color: var(--ink);
+      margin-bottom: 16px;
+      line-height: 1.6;
+    }
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+    .code-tag {
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      padding: 2px 6px;
+      background: var(--code-bg);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      color: var(--typst);
+    }
+
+    /* Accordion */
+    details {
+      margin-top: 14px;
+      border-top: 1px dashed var(--line);
+      padding-top: 12px;
+    }
+    summary {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--typst);
+      cursor: pointer;
+      user-select: none;
+      outline: none;
+    }
+    summary:hover {
+      text-decoration: underline;
+    }
+    .details-content {
+      padding-top: 12px;
+      font-size: 0.92rem;
+    }
+    .details-content ul {
+      margin-left: 20px;
+      margin-bottom: 10px;
+    }
+    .details-content li {
+      margin-bottom: 6px;
+    }
+
+    /* Changelog Table */
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 18px;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .search-input {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      color: var(--ink);
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      min-width: 280px;
+      outline: none;
+    }
+    .search-input:focus {
+      border-color: var(--typst);
+    }
+    .filter-pills {
+      display: flex;
+      gap: 6px;
+    }
+    .filter-btn {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .filter-btn.active, .filter-btn:hover {
+      background: var(--typst-soft);
+      border-color: var(--typst);
+      color: var(--typst);
+    }
+    .table-responsive {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.88rem;
+    }
+    th, td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+    th {
+      background: var(--card);
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+    }
+    tr:last-child td {
+      border-bottom: none;
+    }
+    tr:hover td {
+      background: var(--card-hover);
+    }
+    .commit-hash {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--typst);
+      font-weight: 600;
+    }
+    .badge-feat {
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+    .badge-fix {
+      background: var(--warn-soft);
+      color: var(--warn);
+      border: 1px solid var(--warn);
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+    .badge-perf {
+      background: rgba(130, 80, 223, 0.15);
+      color: #a371f7;
+      border: 1px solid #a371f7;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+    .badge-docs, .badge-chore {
+      background: var(--card);
+      color: var(--muted);
+      border: 1px solid var(--line);
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+
+    /* Gotchas & Tribal Knowledge Cards */
+    .gotcha-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 18px;
+      margin-bottom: 40px;
+    }
+    .gotcha-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 20px;
+      border-left: 4px solid var(--warn);
+      box-shadow: var(--shadow);
+    }
+    .gotcha-card.security {
+      border-left-color: var(--err);
+    }
+    .gotcha-card.tip {
+      border-left-color: var(--typst);
+    }
+    .gotcha-title {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .gotcha-card p {
+      font-size: 0.88rem;
+      color: var(--ink);
+      line-height: 1.5;
+    }
+
+    /* Quickstart Code Snippets */
+    .code-block {
+      background: var(--code-bg);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px 18px;
+      font-family: var(--font-mono);
+      font-size: 0.86rem;
+      color: var(--ink);
+      overflow-x: auto;
+      margin: 12px 0 20px;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 40px 0;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    @media print {
+      body { background: #fff !important; color: #000 !important; }
+      .navbar, .theme-toggle-btn, .filter-bar { display: none !important; }
+      .timeline::before { background: #ddd !important; }
+      .timeline-card, .metric-card, .arch-card, .gotcha-card {
+        border: 1px solid #ccc !important;
+        box-shadow: none !important;
+        background: #fff !important;
+      }
+      details { display: block !important; }
+      details summary { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sticky Navbar -->
+  <header class="navbar">
+    <a href="#top" class="nav-brand">
+      <span>Typst-Editor by Kong</span>
+      <span class="brand-badge">Handoff</span>
+    </a>
+    <nav class="nav-links">
+      <a href="#overview">Overview</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#timeline">Timeline</a>
+      <a href="#changelog">Changelog</a>
+      <a href="#gotchas">Gotchas</a>
+      <a href="#quickstart">Quickstart</a>
+      <button id="themeToggle" class="theme-toggle-btn" aria-label="Toggle theme">
+        <span id="themeIcon">🌓</span> Theme
+      </button>
+    </nav>
+  </header>
+
+  <main class="container" id="top">
+
+    <!-- Hero Section -->
+    <section class="hero">
+      <h1>Engineering Handoff & Changelog</h1>
+      <p>A comprehensive development record, architectural blueprint, and historical evolution from Phase 0 feasibility spike through production hardening.</p>
+      
+      <div class="badge-bar">
+        <span class="pill typst"><b>Tauri</b> v2.0</span>
+        <span class="pill typst"><b>Typst</b> 0.15.1</span>
+        <span class="pill typst"><b>Tinymist</b> 0.15.12</span>
+        <span class="pill success"><b>Tests</b> 56/56 Passing (37 Vitest + 19 Cargo)</span>
+        <span class="pill"><b>Platform</b> Windows 11 (x86_64)</span>
+        <span class="pill"><b>Target</b> com.kong.typst-editor</span>
+      </div>
+    </section>
+
+    <!-- Key Metrics Cards -->
+    <section class="metrics-grid" id="overview">
+      <div class="metric-card">
+        <div class="num">8</div>
+        <div class="label">Major Phases</div>
+        <div class="desc">Phase 0 (Spike) through Phase 7 (Academic Parity & Polish).</div>
+      </div>
+      <div class="metric-card">
+        <div class="num">29</div>
+        <div class="label">Verified Commits</div>
+        <div class="desc">100% green builds with strict test-first development.</div>
+      </div>
+      <div class="metric-card">
+        <div class="num">56</div>
+        <div class="label">Automated Tests</div>
+        <div class="desc">19 pure Rust units + 37 TypeScript Vitest regression suites.</div>
+      </div>
+      <div class="metric-card">
+        <div class="num">0</div>
+        <div class="label">Font Warnings</div>
+        <div class="desc">Full parity with Typst Web App via auto-provisioned TeX Gyre Termes.</div>
+      </div>
+    </section>
+
+    <!-- Architecture Section -->
+    <section id="architecture">
+      <h2 class="section-title">System Architecture & Data Flow</h2>
+      <p class="section-subtitle">A high-performance desktop editor with native LSP, isolated live preview, and guarded local file access.</p>
+
+      <div class="arch-card">
+        <div class="diagram-container">
++---------------------------------------------------------------------------------------------------+
+|                                  TYPST-EDITOR (FRONTEND - WEBVIEW)                               |
+|                                                                                                   |
+|  [Toolbar]          [Sidebar (Ctrl+B)]         [CodeMirror 6 Editor]         [Live Preview Frame]  |
+|  - New / Open       - File Tree (CRUD)         - Typst Grammar               - 127.0.0.1:Ephemeral |
+|  - Export (PDF/PNG) - Outline Navigation       - Word Wrap Compartment       - WebGL/SVG Canvas    |
+|  - Template Market  - Main File Pinning        - Dark/Light Theme Facet      - Double-Click Hook   |
+|  - Settings Modal   - Quick Open (Ctrl+P)      - Autocomplete & Diagnostics  - Zero-flicker Zoom   |
++--------------------------------------------------+------------------------------------------------+
+                                                   | Tauri IPC (invoke & Channel)
+                                                   v
++---------------------------------------------------------------------------------------------------+
+|                                     TAURI 2 RUST BACKEND CORE                                     |
+|                                                                                                   |
+|  [src-tauri/src/lsp_bridge.rs]        [src-tauri/src/lsp_frame.rs]    [src-tauri/src/commands.rs] |
+|  - Spawns & supervises tinymist.exe   - Stream framing parser         - resolve_inside (Guard)    |
+|  - Relays stdin/stdout via stdio      - Content-Length validation     - Atomic file save & read   |
+|  - Injects --font-path & env vars     - 4MB max frame safety limit    - ensure_app_fonts loader   |
+|  - Watchdog restart-once recovery     - UTF-8 byte count boundary     - Multi-format exporter     |
++-------------------+--------------------------------------------------------------+----------------+
+                    |                                                              |
+                    v (stdio pipe)                                                 v (Process execution)
++------------------------------------------+                      +---------------------------------+
+|      TINYMIST LANGUAGE SERVER (0.15.12)  |                      |         TYPST CLI (0.15.1)      |
+|  - Embedded Typst 0.15.1 compiler        |                      |  - typst compile                |
+|  - Auto-completion, hover, diagnostics   |                      |  - PDF / PNG / SVG export       |
+|  - Document symbol outline generator     |                      |  - Accepts --font-path          |
+|  - Built-in live WebSocket preview server|                      +---------------------------------+
++------------------------------------------+
+                    |
+                    v (AppData/Roaming/com.kong.typst-editor/)
++---------------------------------------------------------------------------------------------------+
+|                                       LOCAL APPDATA STORAGE                                       |
+|  - /fonts/ (texgyretermes-regular.otf, bold, italic, bolditalic)                                  |
+|  - /my_templates/ (User local custom offline templates)                                          |
+|  - settings.json (Theme, font size, autosave, custom typst path)                                  |
+|  - template_cache.json (Offline cache of Typst Universe catalog)                                  |
++---------------------------------------------------------------------------------------------------+
+        </div>
+      </div>
+    </section>
+
+    <!-- Interactive Phase Timeline -->
+    <section id="timeline">
+      <h2 class="section-title">Development Timeline (Phase 0 to Present)</h2>
+      <p class="section-subtitle">Chronological progression of features, architectural decisions, and verification gates.</p>
+
+      <div class="timeline">
+
+        <!-- Phase 0 -->
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-card">
+            <div class="timeline-header">
+              <div class="timeline-title">
+                <span>Phase 0: Feasibility Spike & Tech Validation</span>
+                <span class="pill typst">Phase 0</span>
+              </div>
+              <span class="timeline-date">2026-11-10</span>
+            </div>
+            <p class="timeline-desc">
+              Validated the three core high-risk architectural links before writing production code: stdio LSP transport with Tinymist 0.15.12, CodeMirror 6 LSP client compatibility, and embedding the Tinymist preview server inside a sandboxed iframe without opening external browsers.
+            </p>
+            <div class="tag-row">
+              <span class="code-tag">tools/tinymist.exe</span>
+              <span class="code-tag">docs/spike-findings.md</span>
+              <span class="code-tag">stdio framing</span>
+              <span class="code-tag">iframe WebSocket</span>
+            </div>
+            <details>
+              <summary>Key Findings & Deliverables</summary>
+              <div class="details-content">
+                <ul>
+                  <li><b>Pinned Binary:</b> Pinned Tinymist v0.15.12 (built on Typst 0.15.1).</li>
+                  <li><b>LSP Preview Command:</b> Proved <code>tinymist.doStartPreview</code> launches a WebSocket server on <code>127.0.0.1</code> returning dynamic ports.</li>
+                  <li><b>CodeMirror 6 Transport:</b> Connected <code>@codemirror/lsp-client</code> using custom Tauri 2 streaming channels.</li>
+                  <li><b>Artifact:</b> Documented all findings in <code>docs/spike-findings.md</code> with an unconditional GO decision.</li>
+                </ul>
+              </div>
+            </details>
+          </div>
+        </div>
+
+        <!-- Phase 1 -->
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-card">
+            <div class="timeline-header">
+              <div class="timeline-title">
+                <span>Phase 1: Usable Single-File MVP</span>
+                <span class="pill success">Phase 1</span>
+              </div>
+              <span class="timeline-date">2026-11-10</span>
+            </div>
+            <p class="timeline-desc">
+              Built the complete core editor desktop application. Users can open any <code>.typ</code> file, type with full Typst syntax highlighting, get live autocomplete and diagnostics, view continuous sub-second live rendering, and export to PDF.
+            </p>
+            <div class="tag-row">
+              <span class="code-tag">src-tauri/src/lsp_bridge.rs</span>
+              <span class="code-tag">src-tauri/src/lsp_frame.rs</span>
+              <span class="code-tag">src/editor.ts</span>
+              <span class="code-tag">src/preview.ts</span>
+              <span class="code-tag">src/document.ts</span>
+            </div>
+            <details>
+              <summary>Core Features Implemented</summary>
+              <div class="details-content">
+                <ul>
+                  <li><b>LSP Framing Parser:</b> Pure Rust <code>lsp_frame.rs</code> parsing HTTP-style headers with exact UTF-8 byte boundary enforcement.</li>
+                  <li><b>Atomic File Saver:</b> Debounced 1-second autosave with atomic temp-file write and rename to prevent file corruption.</li>
+                  <li><b>Line Ending Detection:</b> Preserves CRLF or LF transparently on Windows.</li>
+                  <li><b>Diagnostics & Status:</b> Problems panel showing compile errors with line and column numbers.</li>
+                  <li><b>PDF Export:</b> Integrated Typst CLI compilation with clean error formatting.</li>
+                  <li><b>Watchdog:</b> Auto-restart language server on crash with a restart-once guard.</li>
+                </ul>
+              </div>
+            </details>
+          </div>
+        </div>
+
+        <!-- Phase 2 -->
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-card">
+            <div class="timeline-header">
+              <div class="timeline-title">
+                <span>Phase 2: Multi-File Comfort & Workspace</span>
+                <span class="pill success">Phase 2</span>
+              </div>
+              <span class="timeline-date">2026-11-10</span>
+            </div>
+            <p class="timeline-desc">
+              Transformed the single-file editor into a multi-file IDE with directory navigation, outline view, main document pinning, quick open palette, document formatting, and theme customization.
+            </p>
+            <div class="tag-row">
+              <span class="code-tag">src/files.ts</span>
+              <span class="code-tag">src/outline.ts</span>
+              <span class="code-tag">src/quick_open.ts</span>
+              <span class="code-tag">src/settings.ts</span>
+              <span class="code-tag">resolve_inside</span>
+            </div>
+            <details>
+              <summary>Core Features Implemented</summary>
+              <div class="details-content">
+                <ul>
+                  <li><b>Guarded File Operations:</b> <code>resolve_inside</code> ensures all CRUD (create, rename, delete) operations remain strictly jailed inside the project folder.</li>
+                  <li><b>Collapsible Sidebar:</b> File tree with active file indicators, plus document outline parsing <code>textDocument/documentSymbol</code>.</li>
+                  <li><b>Main File Pinning:</b> Allows pinning <code>main.typ</code> via <code>tinymist.pinMain</code> so editing sub-chapters maintains full root compilation context.</li>
+                  <li><b>Quick Open Palette:</b> <code>Ctrl+P</code> modal dialog with instant fuzzy searching across all project files.</li>
+                  <li><b>Settings & Themes:</b> Light, Dark, and System theme switching with custom font sizing and autosave preferences.</li>
+                  <li><b>Document Formatting:</b> Integrated LSP document formatting via <code>Shift+Alt+F</code>.</li>
+                </ul>
+              </div>
+            </details>
+          </div>
+        </div>
+
+        <!-- Phase 3 -->
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-card">
+            <div class="timeline-header">
+              <div class="timeline-title">
+                <span>Phase 3: Packaging, Bundling & Multi-Format Export</span>
+                <span class="pill success">Phase 3</span>
+              </div>
+              <span class="timeline-date">2026-11-10</span>
+            </div>
+            <p class="timeline-desc">
+              Prepared the application for distribution with native Windows installer bundling, bundled Tinymist binary resources, Windows file associations for <code>.typ</code>, and multi-format image exports.
+            </p>
+            <div class="tag-row">
+              <span class="code-tag">tauri.conf.json</span>
+              <span class="code-tag">NSIS Installer</span>
+              <span class="code-tag">PNG/SVG Export</span>
+              <span class="code-tag">check_typst</span>
+            </div>
+            <details>
+              <summary>Core Features Implemented</summary>
+              <div class="details-content">
+                <ul>
+                  <li><b>Bundled Resources:</b> <code>tools/tinymist.exe</code> packaged directly into Tauri application resources.</li>
+                  <li><b>File Associations:</b> Windows shell integration associating <code>.typ</code> documents with Typst-Editor.</li>
+                  <li><b>Multi-Format Export:</b> Added PNG and SVG exports alongside PDF, with automatic <code>{n}</code> page numbering for raster multi-page documents.</li>
+                  <li><b>Typst Detection:</b> First-run check validating whether Typst CLI is installed, with guidance banner to install via <code>winget install Typst.Typst</code> or set custom binary path.</li>
+                </ul>
+              </div>
+            </details>
+          </div>
+        </div>
+
+        <!-- Phase 4 -->
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-card">
+            <div class="timeline-header">
+              <div class="timeline-title">
+                <span>Phase 4: Auto-Update System & Release Pipeline</span>
+                <span class="pill success">Phase 4</span>
+              </div>
+              <span class="timeline-date">2026-11-10</span>
+            </div>
+            <p class="timeline-desc">
+              Implemented an end-to-end cryptographic release and auto-update infrastructure with quiet notifications and dirty-document protection.
+            </p>
+            <div class="tag-row">
+              <span class="code-tag">tools/generate-keys.ps1</span>
+              <span class="code-tag">tools/build-release.ps1</span>
+              <span class="code-tag">check_app_update</span>
+              <span class="code-tag">Unsaved Work Guard</span>
+            </div>
+            <details>
+              <summary>Core Features Implemented</summary>
+              <div class="details-content">
+                <ul>
+                  <li><b>Cryptographic Signing:</b> Ed25519 key generation and build scripts generating signed <code>latest.json</code> manifests.</li>
+                  <li><b>Semver Update Engine:</b> Asynchronous update checker with semantic version parsing (<code>is_version_newer</code>).</li>
+                  <li><b>Unsaved Work Guard:</b> Blocks updater restart if unsaved document edits are present in the editor.</li>
+                  <li><b>Offline Resilience:</b> Update checks fail silently in background without impeding editor workflows.</li>
+                </ul>
+              </div>
+            </details>
+          </div>
+        </div>
+
+        <!-- Phase 5 -->
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-card">
+            <div class="timeline-header">
+              <div class="timeline-title">
+                <span>Phase 5: Typst Universe Template Market & Offline Cache</span>
+                <span class="pill success">Phase 5</span>
+              </div>
+              <span class="timeline-date">2026-11-10</span>
+            </div>
+            <p class="timeline-desc">
+              Brought the complete Typst Universe package catalog into the editor with instant search, category filtering, one-click template initialization, offline caching, and user custom template storage.
+            </p>
+            <div class="tag-row">
+              <span class="code-tag">src/templates.ts</span>
+              <span class="code-tag">packages.typst.org</span>
+              <span class="code-tag">template_cache.json</span>
+              <span class="code-tag">my_templates/</span>
+            </div>
+            <details>
+              <summary>Core Features Implemented</summary>
+              <div class="details-content">
+                <ul>
+                  <li><b>Catalog Sync & Cache:</b> Fetches official Typst Universe packages and caches them to <code>AppData/template_cache.json</code> for 100% offline access.</li>
+                  <li><b>Responsive UI:</b> A4 aspect-ratio preview cards, category pills (Paper, Thesis, Report, CV, Slides), and real-time search filtering.</li>
+                  <li><b>One-Click Scaffolding:</b> Runs <code>typst init @preview/&lt;name&gt;:&lt;version&gt;</code> and immediately loads the created project into the workspace.</li>
+                  <li><b>Local "My Templates":</b> User can save any active project into their personal template library with offline persistence.</li>
+                </ul>
+              </div>
+            </details>
+          </div>
+        </div>
+
+        <!-- Phase 6 -->
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-card">
+            <div class="timeline-header">
+              <div class="timeline-title">
+                <span>Phase 6: Quality, Security & Hardening Audit</span>
+                <span class="pill warn">Hardening</span>
+              </div>
+              <span class="timeline-date">2026-11-11</span>
+            </div>
+            <p class="timeline-desc">
+              Conducted comprehensive code and security audits: eliminated memory leaks, guarded LSP framing from unbounded payloads, patched disk bloat, and hardened window exit safety.
+            </p>
+            <div class="tag-row">
+              <span class="code-tag">Cargo profile optimization</span>
+              <span class="code-tag">4MB frame limit</span>
+              <span class="code-tag">Path traversal regex</span>
+              <span class="code-tag">Window close guard</span>
+            </div>
+            <details>
+              <summary>Key Audit Improvements</summary>
+              <div class="details-content">
+                <ul>
+                  <li><b>Target Bloat Elimination:</b> Configured <code>split-debuginfo = "packed"</code> and <code>incremental = false</code> in Cargo profiles, plus created <code>tools/clean-target.ps1</code>.</li>
+                  <li><b>Unsaved Data Safety:</b> Hooked <code>onCloseRequested</code> to prompt users before closing when changes are dirty.</li>
+                  <li><b>LSP DoS Prevention:</b> Capped LSP message headers to a maximum of 4MB to prevent memory exhaustion attacks.</li>
+                  <li><b>Path Normalization:</b> Fixed Windows URI vs OS file paths (<code>\</code> vs <code>/</code>) and Thai character encoding.</li>
+                  <li><b>Readiness Probes:</b> Added dynamic TCP port probing and retry loops to eliminate preview connection race conditions.</li>
+                </ul>
+              </div>
+            </details>
+          </div>
+        </div>
+
+        <!-- Phase 7 -->
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-card">
+            <div class="timeline-header">
+              <div class="timeline-title">
+                <span>Phase 7: Academic Font Parity & Polish (Present)</span>
+                <span class="pill typst">Current State</span>
+              </div>
+              <span class="timeline-date">2026-11-11</span>
+            </div>
+            <p class="timeline-desc">
+              Achieved zero-warning parity with Typst Web App for academic papers by auto-provisioning <i>TeX Gyre Termes</i> OpenType fonts, added official Universe WebP thumbnails, resolved autocomplete popover contrast in dark mode, and strictly gated bi-directional sync to double-click.
+            </p>
+            <div class="tag-row">
+              <span class="code-tag">ensure_app_fonts</span>
+              <span class="code-tag">TeX Gyre Termes</span>
+              <span class="code-tag">Word Wrap Toggle</span>
+              <span class="code-tag">Double-Click Sync</span>
+              <span class="code-tag">Package Auto-patch</span>
+            </div>
+            <details>
+              <summary>Latest Enhancements & Fixes</summary>
+              <div class="details-content">
+                <ul>
+                  <li><b>Auto-Provisioned Fonts:</b> Automatically downloads and caches OpenType TeX Gyre Termes fonts into <code>AppData/Roaming/com.kong.typst-editor/fonts/</code>, passing <code>--font-path</code> and <code>TYPST_FONT_PATHS</code> to LSP, preview, and CLI exports.</li>
+                  <li><b>Universe Image Previews:</b> Official WebP thumbnails displayed on template cards with semver deduplication showing only the latest release per template.</li>
+                  <li><b>High-Contrast Suggestion Box:</b> CodeMirror theme compartment and CSS overhaul ensuring bright text against dark panels in dark mode.</li>
+                  <li><b>Strict Double-Click Bi-directional Navigation:</b> Eliminated jumpy cursor scrolls; editor-to-preview and preview-to-editor only navigate upon explicit double-click.</li>
+                  <li><b>Editor Word Wrap:</b> User-configurable word wrapping in Settings modal, dynamically applied to CodeMirror.</li>
+                  <li><b>Deprecated Package Syntax Auto-patch:</b> Auto-fixes unspaced raw text blocks (<code>```&lt;svg</code>) during document formatting and auto-patches cached packages like <code>scienceicons:0.1.0</code>.</li>
+                </ul>
+              </div>
+            </details>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Changelog Section -->
+    <section id="changelog">
+      <h2 class="section-title">Verified Git Commit Changelog</h2>
+      <p class="section-subtitle">Complete chronological record of all 29 commits with commit message, author, and category.</p>
+
+      <div class="filter-bar">
+        <input type="text" id="commitSearch" class="search-input" placeholder="Search commits, files, or keywords...">
+        <div class="filter-pills">
+          <button class="filter-btn active" data-filter="all">All</button>
+          <button class="filter-btn" data-filter="feat">Features</button>
+          <button class="filter-btn" data-filter="fix">Fixes</button>
+          <button class="filter-btn" data-filter="perf">Perf & Polish</button>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table id="changelogTable">
+          <thead>
+            <tr>
+              <th style="width: 100px;">Commit</th>
+              <th style="width: 100px;">Date</th>
+              <th style="width: 90px;">Type</th>
+              <th>Description</th>
+              <th style="width: 130px;">Author</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr data-type="chore">
+              <td><span class="commit-hash">2ad64ec</span></td>
+              <td>2026-11-10</td>
+              <td><span class="badge-chore">chore</span></td>
+              <td>init repo, pin tinymist</td>
+              <td>narongrit1053</td>
+            </tr>
+            <tr data-type="feat">
+              <td><span class="commit-hash">8349a67</span></td>
+              <td>2026-11-10</td>
+              <td><span class="badge-feat">feat</span></td>
+              <td>app skeleton and layout</td>
+              <td>narongrit1053</td>
+            </tr>
+            <tr data-type="feat">
+              <td><span class="commit-hash">cf8b8be</span></td>
+              <td>2026-11-10</td>
+              <td><span class="badge-feat">feat</span></td>
+              <td>LSP message framing</td>
+              <td>narongrit1053</td>
+            </tr>
+            <tr data-type="feat">
+              <td><span class="commit-hash">6de2b22</span></td>
+              <td>2026-11-10</td>
+              <td><span class="badge-feat">feat</span></td>
+              <td>tinymist bridge</td>
+              <td>narongrit1053</td>
+            </tr>
+            <tr data-type="feat">
+              <td><span class="commit-hash">0238211</span></td>
+              <td>2026-11-10</td>
+              <td><span class="badge-feat">feat</span></td>
+              <td>guarded file commands</td>
+              <td>narongrit1053</td>
+            </tr>
+            <tr data-type="feat">
+              <td><span class="commit-hash">d293b28</span></td>
+              <td>2026-11-10</td>
+              <td><span class="badge-feat">feat</span></td>
+              <td>editor with tinymist autocomplete</td>
+              <td>narongrit1053</td>
+            </tr>
+            <tr data-type="feat">
+              <td><span class="commit-hash">a8b6eb5</span></td>
+              <td>2026-11-10</td>
+              <td><span class="badge-feat">feat</span></td>
+              <td>live preview</td>
+              <td>narongrit1053</td>
+            </tr>
+            <tr data-type="feat">
+              <td><span class="commit-hash">18f2156</span></td>
+              <td>2026-11-10</td>
+              <td><span class="badge-feat">feat</span></td>
+              <td>save and autosave</td>
+              <td>narongrit1053</td>
+            </tr>
+            <tr data-type="feat">
+              <td><span class="commit-hash">740363e</span></td>
+              <td>2026-11-10</td>
+              <td><span class="badge-feat">feat</span></td>
+              <td>problems panel and status bar</td>
+              <td>narongrit1053</td>
+            </tr>
+            <tr data-type="feat">
+              <td><span class="commit-hash">0d69dcf</span></td>
+              <td>2026-11-10</td>
+              <td><span class="badge-feat">feat</span></td>
+              <td>export pdf</td>
+              <td>narongrit1053</td>
+            </tr>
+            <tr data-type="feat">
+              <td><span class="commit-hash">cdf93d2</span></td>
+              <td>2026-11-10</td>
+              <td><span class="badge-feat">feat</span></td>
+              <td>language service recovery; docs: phase 1 smoke checklist</td>
+              <td>narongrit1053</td>
+            </tr>
+            <tr data-type="docs">
+              <td><span class="commit-hash">6d227c2</span></td>
+              <td>2026-11-10</td>
+              <td><span class="badge-docs">docs</span></td>
+              <td>phase 2 implementation plan</td>
+              <td>narongrit1053</td>
+            </tr>
+            <tr data-type="feat">
+              <td><span class="commit-hash">42faaf6</span></td>
+              <td>2026-11-10</td>
+              <td><span class="badge-feat">feat</span></td>
+              <td>filesystem CRUD and settings commands</td>
+              <td>narongrit1053</td>
+            </tr>
+            <tr data-type="feat">
+              <td><span class="commit-hash">4903fa9</span></td>
+              <td>2026-11-10</td>
+              <td><span class="badge-feat">feat</span></td>
+              <td>settings modal and theme support</td>
+              <td>narongrit1053</td>
+            </tr>
+            <tr data-type="feat">
+              <td><span class="commit-hash">ea6d689</span></td>
+              <td>2026-11-10</td>
+              <td><span class="badge-feat">feat</span></td>
+              <td>phase 2 multi-file comfort complete with file tree, outline, quick open, formatting, and zoom</td>
+              <td>narongrit1053</td>
+            </tr>
+            <tr data-type="feat">
+              <td><span class="commit-hash">dd9bd14</span></td>
+              <td>2026-11-10</td>
+              <td><span class="badge-feat">feat</span></td>
+              <td>phase 3 packaging, installer bundle config, typst detection, and multi-format export</td>
+              <td>narongrit1053</td>
+            </tr>
+            <tr data-type="feat">
+              <td><span class="commit-hash">d77f23d</span></td>
+              <td>2026-11-10</td>
+              <td><span class="badge-feat">feat</span></td>
+              <td>phase 4 update check, signing script, release builder, and unsaved work guard</td>
+              <td>narongrit1053</td>
+            </tr>
+            <tr data-type="feat">
+              <td><span class="commit-hash">01a4adc</span></td>
+              <td>2026-11-10</td>
+              <td><span class="badge-feat">feat</span></td>
+              <td>phase 5 template market, typst universe catalog, offline cache, and local templates</td>
+              <td>narongrit1053</td>
+            </tr>
+            <tr data-type="perf">
+              <td><span class="commit-hash">ff87256</span></td>
+              <td>2026-11-10</td>
+              <td><span class="badge-perf">perf</span></td>
+              <td>configure Cargo profiles to prevent target disk bloat and add clean script</td>
+              <td>narongrit1053</td>
+            </tr>
+            <tr data-type="fix">
+              <td><span class="commit-hash">83e0cf6</span></td>
+              <td>2026-11-10</td>
+              <td><span class="badge-fix">fix</span></td>
+              <td>export menu visibility, window permissions, and welcome screen on empty state</td>
+              <td>narongrit1053</td>
+            </tr>
+            <tr data-type="fix">
+              <td><span class="commit-hash">31c2e41</span></td>
+              <td>2026-11-10</td>
+              <td><span class="badge-fix">fix</span></td>
+              <td>initialize event listeners reliably regardless of document readyState</td>
+              <td>narongrit1053</td>
+            </tr>
+            <tr data-type="fix">
+              <td><span class="commit-hash">18a584b</span></td>
+              <td>2026-11-10</td>
+              <td><span class="badge-fix">fix</span></td>
+              <td>auto-format multi-page image export, constrain banner height with dismiss, and fix folder opening</td>
+              <td>narongrit1053</td>
+            </tr>
+            <tr data-type="fix">
+              <td><span class="commit-hash">9f50e5c</span></td>
+              <td>2026-11-11</td>
+              <td><span class="badge-fix">fix</span></td>
+              <td>resolve audit issues (safe window close, rethrow save errors, installer url check, clean dom, frame limit)</td>
+              <td>narongrit1053</td>
+            </tr>
+            <tr data-type="fix">
+              <td><span class="commit-hash">aa102b3</span></td>
+              <td>2026-11-11</td>
+              <td><span class="badge-fix">fix</span></td>
+              <td>preview click-to-source path decoding, slash normalization, and directory recursion guard</td>
+              <td>narongrit1053</td>
+            </tr>
+            <tr data-type="fix">
+              <td><span class="commit-hash">dc3e7c6</span></td>
+              <td>2026-11-11</td>
+              <td><span class="badge-fix">fix</span></td>
+              <td>preview readiness probe, dynamic port allocation, editor LSP reset, and unique installer path</td>
+              <td>narongrit1053</td>
+            </tr>
+            <tr data-type="feat">
+              <td><span class="commit-hash">276d123</span></td>
+              <td>2026-11-11</td>
+              <td><span class="badge-feat">feat</span></td>
+              <td>add template market image previews and official universe thumbnails</td>
+              <td>narongrit1053</td>
+            </tr>
+            <tr data-type="feat">
+              <td><span class="commit-hash">a26125d</span></td>
+              <td>2026-11-11</td>
+              <td><span class="badge-feat">feat</span></td>
+              <td>auto-provision TeX Gyre fonts and wire font paths into lsp, preview, and export</td>
+              <td>narongrit1053</td>
+            </tr>
+            <tr data-type="feat">
+              <td><span class="commit-hash">890fc1e</span></td>
+              <td>2026-11-11</td>
+              <td><span class="badge-feat">feat</span></td>
+              <td>semver deduplication for templates, contrast autocomplete, bidirectional preview sync, and smooth preview rendering</td>
+              <td>narongrit1053</td>
+            </tr>
+            <tr data-type="fix">
+              <td><span class="commit-hash">0766553</span></td>
+              <td>2026-11-11</td>
+              <td><span class="badge-fix">fix</span></td>
+              <td>high contrast autocomplete popup, font paths, double-click bidirectional jump, and text wrapping</td>
+              <td>narongrit1053</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Tribal Knowledge & Gotchas -->
+    <section id="gotchas">
+      <h2 class="section-title">Engineering Gotchas & Tribal Knowledge</h2>
+      <p class="section-subtitle">Critical edge cases discovered through testing and production use that incoming developers must know.</p>
+
+      <div class="gotcha-grid">
+        <div class="gotcha-card security">
+          <div class="gotcha-title">⚠️ LSP UTF-8 Byte Framing</div>
+          <p>
+            In LSP HTTP framing, <code>Content-Length</code> represents the <b>byte count</b> in UTF-8, <i>not</i> the character count. Documents with non-ASCII content (such as Thai characters, mathematical symbols, or emojis) will corrupt the stream if <code>string.length</code> is used instead of <code>Buffer.byteLength()</code> or Rust's <code>as_bytes().len()</code>.
+          </p>
+        </div>
+
+        <div class="gotcha-card tip">
+          <div class="gotcha-title">🔤 Typst Font Discovery</div>
+          <p>
+            Typst does not automatically scan <code>%LOCALAPPDATA%/typst/fonts</code>. It only scans system fonts (<code>C:\Windows\Fonts</code>) and explicitly supplied paths. The backend auto-provisions fonts to <code>%APPDATA%/com.kong.typst-editor/fonts/</code> and injects both <code>--font-path</code> and <code>TYPST_FONT_PATHS</code> across LSP, preview, and CLI compile.
+          </p>
+        </div>
+
+        <div class="gotcha-card">
+          <div class="gotcha-title">📁 Windows Path Normalization</div>
+          <p>
+            Tinymist produces URIs like <code>file:///d:/try/typst/paper.typ</code>, while Windows uses <code>D:\Try\Typst\paper.typ</code>. Always use <code>normalizePath()</code> (converting all slashes to <code>\</code> and lowercase) before performing equality checks, otherwise jump-to-source will fail to identify the active editor file.
+          </p>
+        </div>
+
+        <div class="gotcha-card">
+          <div class="gotcha-title">🖱️ Double-Click Protocol for Sync</div>
+          <p>
+            Tinymist's preview client sends a jump event on every single click. To prevent typing, text selection, or casual cursor movements from constantly throwing the user across the document, the app gates bidirectional jumps behind a <b>400ms double-click threshold</b> on both sides.
+          </p>
+        </div>
+
+        <div class="gotcha-card tip">
+          <div class="gotcha-title">📦 Package Deprecation Auto-Patching</div>
+          <p>
+            Certain popular community packages (like <code>scienceicons:0.1.0</code>) contain inline raw blocks without whitespace (e.g. <code>```&lt;svg</code>). In Typst 0.12+, this produces deprecation warnings. The Rust backend automatically checks and patches cached packages on startup, and editor formatting cleans them dynamically.
+          </p>
+        </div>
+
+        <div class="gotcha-card security">
+          <div class="gotcha-title">🛡️ Filesystem Root Guarding</div>
+          <p>
+            Never allow raw path concatenation in Tauri commands. All CRUD operations run through <code>resolve_inside(&root, &target)</code> in Rust, strictly blocking path traversal attempts (such as <code>../../secret.txt</code>) and rejecting paths outside the workspace folder.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quickstart & Maintenance -->
+    <section id="quickstart">
+      <h2 class="section-title">Developer Quick Start & Commands</h2>
+      <p class="section-subtitle">Commands to verify, run, test, and package the codebase from scratch.</p>
+
+      <div class="arch-card">
+        <h3>1. Run in Development Mode</h3>
+        <p>Spawns Vite frontend dev server and runs Tauri backend with hot reload:</p>
+        <div class="code-block">npm run tauri dev</div>
+
+        <h3>2. Run Test Suites</h3>
+        <p>Run both frontend unit regression tests and Rust backend test suite:</p>
+        <div class="code-block"># Run TypeScript unit tests (37 tests across 9 files)
+npm run test
+
+# Run Rust unit tests (19 tests)
+cargo test --manifest-path src-tauri/Cargo.toml</div>
+
+        <h3>3. Build Production Installer</h3>
+        <p>Produces optimized NSIS Windows standalone installer and portable binary in <code>src-tauri/target/release/bundle/nsis/</code>:</p>
+        <div class="code-block">npm run tauri build</div>
+
+        <h3>4. Clean Target Artifacts</h3>
+        <p>If target disk size grows during development, use the automated cleanup utility:</p>
+        <div class="code-block">powershell -ExecutionPolicy Bypass -File tools/clean-target.ps1</div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+      <p>Typst-Editor by Kong — Engineering Handoff Documentation — Generated on November 11, 2026</p>
+      <p style="margin-top: 6px; font-size: 0.8rem;">All test suites verified • Windows 11 x86_64 • Tauri 2.0</p>
+    </footer>
+
+  </main>
+
+  <!-- Interactive JavaScript -->
+  <script>
+    // Theme toggle
+    const themeToggleBtn = document.getElementById("themeToggle");
+    const themeIcon = document.getElementById("themeIcon");
+    const root = document.documentElement;
+
+    function applyTheme(theme) {
+      if (theme === "light") {
+        root.setAttribute("data-theme", "light");
+        themeIcon.textContent = "☀️";
+      } else {
+        root.removeAttribute("data-theme");
+        themeIcon.textContent = "🌙";
+      }
+      localStorage.setItem("handoff_theme", theme);
+    }
+
+    const savedTheme = localStorage.getItem("handoff_theme") || 
+      (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+    applyTheme(savedTheme);
+
+    themeToggleBtn.addEventListener("click", () => {
+      const current = root.getAttribute("data-theme") === "light" ? "light" : "dark";
+      applyTheme(current === "light" ? "dark" : "light");
+    });
+
+    // Changelog Search and Filter
+    const searchInput = document.getElementById("commitSearch");
+    const filterBtns = document.querySelectorAll(".filter-btn");
+    const tableRows = document.querySelectorAll("#changelogTable tbody tr");
+
+    let currentFilter = "all";
+
+    function filterTable() {
+      const query = searchInput.value.toLowerCase().trim();
+      tableRows.forEach(row => {
+        const rowType = row.getAttribute("data-type") || "";
+        const rowText = row.textContent.toLowerCase();
+
+        const matchesFilter = (currentFilter === "all") || 
+          (currentFilter === "feat" && rowType === "feat") ||
+          (currentFilter === "fix" && rowType === "fix") ||
+          (currentFilter === "perf" && (rowType === "perf" || rowType === "docs" || rowType === "chore"));
+
+        const matchesQuery = !query || rowText.includes(query);
+
+        if (matchesFilter && matchesQuery) {
+          row.style.display = "";
+        } else {
+          row.style.display = "none";
+        }
+      });
+    }
+
+    searchInput.addEventListener("input", filterTable);
+
+    filterBtns.forEach(btn => {
+      btn.addEventListener("click", () => {
+        filterBtns.forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        currentFilter = btn.getAttribute("data-filter") || "all";
+        filterTable();
+      });
+    });
+  </script>
+</body>
+</html>
