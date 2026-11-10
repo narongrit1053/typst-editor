@@ -1,13 +1,17 @@
 import { invoke } from "@tauri-apps/api/core";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { open as openDialog, ask } from "@tauri-apps/plugin-dialog";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { connectLsp, LspConnection } from "./lsp";
 import { createEditor, EditorHandle } from "./editor";
 import { startPreview, stopPreview } from "./preview";
+import { detectEol, withEol, createSaver, Saver } from "./document";
 
 let lspConnection: LspConnection | null = null;
 let editor: EditorHandle | null = null;
+let saver: Saver | null = null;
 let currentFilePath: string | null = null;
+let currentEol: "\r\n" | "\n" = "\n";
 
 export function getCurrentFilePath(): string | null {
   return currentFilePath;
@@ -19,6 +23,48 @@ export function getCurrentEditor(): EditorHandle | null {
 
 export function getLspConnection(): LspConnection | null {
   return lspConnection;
+}
+
+export function getSaver(): Saver | null {
+  return saver;
+}
+
+function showBanner(message: string, isError = true) {
+  const banner = document.getElementById("banner");
+  const bannerText = document.getElementById("banner-text");
+  if (!banner || !bannerText) return;
+
+  bannerText.textContent = message;
+  banner.classList.remove("hidden");
+  if (isError) {
+    banner.style.background = "var(--err-soft)";
+    banner.style.color = "var(--err)";
+    banner.style.borderColor = "var(--err)";
+  } else {
+    banner.style.background = "var(--warn-soft)";
+    banner.style.color = "var(--warn)";
+    banner.style.borderColor = "var(--warn)";
+  }
+}
+
+export function hideBanner() {
+  const banner = document.getElementById("banner");
+  if (banner) {
+    banner.classList.add("hidden");
+  }
+}
+
+function updateFileNameDisplay(path: string | null, isDirty: boolean) {
+  const fileNameEl = document.getElementById("file-name");
+  if (!fileNameEl) return;
+  if (!path) {
+    fileNameEl.textContent = "No file open";
+    fileNameEl.title = "";
+    return;
+  }
+  const baseName = path.split(/[\\/]/).pop() || path;
+  fileNameEl.textContent = isDirty ? `${baseName} ●` : baseName;
+  fileNameEl.title = path;
 }
 
 function initSplitter() {
@@ -72,6 +118,13 @@ export async function openFile(filePath?: string) {
     targetPath = selected;
   }
 
+  // If dirty, save current before switching
+  if (saver && saver.isDirty()) {
+    try {
+      await saver.saveNow();
+    } catch {}
+  }
+
   const folder = targetPath.replace(/[\\/][^\\/]+$/, "") || ".";
   await stopPreview();
   await invoke("set_root", { path: folder });
@@ -97,7 +150,35 @@ export async function openFile(filePath?: string) {
 
   const content = await invoke<string>("read_file", { path: targetPath });
   currentFilePath = targetPath;
+  currentEol = detectEol(content);
+
+  saver = createSaver({
+    getText: () => editor?.getText() || "",
+    write: async (text) => {
+      if (!currentFilePath) return;
+      const normalized = withEol(text, currentEol);
+      await invoke("write_file", { path: currentFilePath, contents: normalized });
+    },
+    onState: (state, err) => {
+      if (state === "saved") {
+        hideBanner();
+        updateFileNameDisplay(currentFilePath, false);
+      } else if (state === "dirty" || state === "saving") {
+        updateFileNameDisplay(currentFilePath, true);
+      } else if (state === "error") {
+        updateFileNameDisplay(currentFilePath, true);
+        showBanner(`Save failed: ${err || "Unknown error"}`);
+      }
+    },
+    delayMs: 1000,
+  });
+
+  editor.onChange(() => {
+    saver?.touch();
+  });
+
   editor.open(targetPath, content);
+  updateFileNameDisplay(targetPath, false);
 
   const previewFrame = document.getElementById("preview") as HTMLIFrameElement;
   if (previewFrame && lspConnection) {
@@ -105,16 +186,9 @@ export async function openFile(filePath?: string) {
       console.error("Preview start failed:", err);
     });
   }
-
-  const fileNameEl = document.getElementById("file-name");
-  if (fileNameEl) {
-    const baseName = targetPath.split(/[\\/]/).pop() || targetPath;
-    fileNameEl.textContent = baseName;
-    fileNameEl.title = targetPath;
-  }
 }
 
-window.addEventListener("DOMContentLoaded", () => {
+window.addEventListener("DOMContentLoaded", async () => {
   initSplitter();
 
   const btnOpen = document.getElementById("btn-open");
@@ -128,8 +202,39 @@ window.addEventListener("DOMContentLoaded", () => {
     if (e.ctrlKey && e.key.toLowerCase() === "o") {
       e.preventDefault();
       openFile().catch(console.error);
+    } else if (e.ctrlKey && e.key.toLowerCase() === "s") {
+      e.preventDefault();
+      if (saver) {
+        saver.saveNow().catch((err) => {
+          showBanner(`Save failed: ${err?.message || err}`);
+        });
+      }
     }
   });
+
+  try {
+    const appWindow = getCurrentWindow();
+    await appWindow.onCloseRequested(async (event) => {
+      if (saver && saver.isDirty()) {
+        try {
+          await saver.saveNow();
+        } catch {
+          // save failed, ask confirmation
+          const shouldClose = await ask(
+            "Could not save changes. Close without saving?",
+            { title: "Typst-Editor by Kong", kind: "warning" },
+          );
+          if (!shouldClose) {
+            event.preventDefault();
+            return;
+          }
+        }
+      }
+      stopPreview().catch(() => {});
+    });
+  } catch (e) {
+    console.warn("Could not register window close listener:", e);
+  }
 
   window.addEventListener("beforeunload", () => {
     stopPreview().catch(() => {});
