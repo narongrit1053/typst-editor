@@ -1,6 +1,18 @@
 import { describe, it, expect } from "vitest";
-import { sortFileNodes, FileNode } from "./files";
+import { sortFileNodes, FileNode, isImagePath } from "./files";
 import { extractDialogPath } from "./main";
+
+describe("isImagePath", () => {
+  it("matches image extensions case-insensitively", () => {
+    expect(isImagePath("D:/proj/fig/Plot.PNG")).toBe(true);
+    expect(isImagePath("D:/proj/logo.svg")).toBe(true);
+  });
+
+  it("rejects typst files and extensionless names", () => {
+    expect(isImagePath("D:/proj/main.typ")).toBe(false);
+    expect(isImagePath("D:/proj/png")).toBe(false);
+  });
+});
 
 describe("File tree sorting", () => {
   it("sorts directories first, then alphabetical case-insensitively", () => {

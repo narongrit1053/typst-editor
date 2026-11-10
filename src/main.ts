@@ -14,7 +14,7 @@ import {
 } from "./preview";
 import { detectEol, withEol, createSaver, Saver } from "./document";
 import { renderProblems, summarise } from "./problems";
-import { fetchDirectoryEntries, renderFileTree, toggleSidebar } from "./files";
+import { fetchDirectoryEntries, isImagePath, renderFileTree, toggleSidebar } from "./files";
 import { parseOutlineSymbols, renderOutline } from "./outline";
 import { showQuickOpen } from "./quick_open";
 import {
@@ -735,7 +735,41 @@ export async function openFolder(folderPath?: string) {
   }
 }
 
+const IMAGE_MIME: Record<string, string> = { svg: "image/svg+xml", jpg: "image/jpeg", ico: "image/x-icon" };
+
+async function showImage(path: string) {
+  const modal = document.getElementById("modal-image");
+  const img = document.getElementById("image-viewer-img") as HTMLImageElement | null;
+  const title = document.getElementById("image-viewer-title");
+  if (!modal || !img || !title) return;
+  try {
+    const bytes = await invoke<ArrayBuffer>("read_file_bytes", { path });
+    const ext = path.split(".").pop()!.toLowerCase();
+    const url = URL.createObjectURL(new Blob([bytes], { type: IMAGE_MIME[ext] || `image/${ext}` }));
+    if (img.src.startsWith("blob:")) URL.revokeObjectURL(img.src);
+    img.src = url;
+    img.alt = title.textContent = path.split(/[\\/]/).pop() || path;
+    modal.classList.remove("hidden");
+  } catch (e: any) {
+    showBanner(`Could not open image: ${e?.message || e}`);
+  }
+}
+
+function closeImage() {
+  const modal = document.getElementById("modal-image");
+  const img = document.getElementById("image-viewer-img") as HTMLImageElement | null;
+  modal?.classList.add("hidden");
+  if (img?.src.startsWith("blob:")) {
+    URL.revokeObjectURL(img.src);
+    img.removeAttribute("src");
+  }
+}
+
 export async function openFile(filePath?: string) {
+  if (filePath && isImagePath(filePath)) {
+    await showImage(filePath);
+    return;
+  }
   let targetPath = filePath;
   if (!targetPath) {
     try {
@@ -1119,6 +1153,15 @@ function initApp() {
   // Window focus check
   window.addEventListener("focus", () => {
     handleExternalFileChange().catch(console.error);
+  });
+
+  const imageModal = document.getElementById("modal-image");
+  document.getElementById("btn-image-close")?.addEventListener("click", closeImage);
+  imageModal?.addEventListener("click", (e) => {
+    if (e.target === imageModal) closeImage();
+  });
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && imageModal && !imageModal.classList.contains("hidden")) closeImage();
   });
 
   try {

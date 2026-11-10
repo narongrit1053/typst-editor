@@ -27,6 +27,7 @@ pub fn run() {
             lsp_bridge::lsp_stop,
             commands::set_root,
             commands::read_file,
+            commands::read_file_bytes,
             commands::write_file,
             commands::list_dir,
             commands::create_file,

@@ -38,6 +38,13 @@ export async function fetchDirectoryEntries(subPath?: string): Promise<FileNode[
 // Folders the user has expanded; survives tree refreshes (create/rename/delete).
 const expandedDirs = new Set<string>();
 
+export const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico"];
+
+export function isImagePath(path: string): boolean {
+  const ext = path.split(".").pop()?.toLowerCase() || "";
+  return path.includes(".") && IMAGE_EXTENSIONS.includes(ext);
+}
+
 export function renderFileTree(
   container: HTMLElement,
   entries: FileNode[],
@@ -98,7 +105,7 @@ function renderNodes(
     }
 
     const isOpen = node.isDir && expandedDirs.has(node.path);
-    const icon = node.isDir ? (isOpen ? "▾ 📂" : "▸ 📁") : isPinned ? "📌" : "📄";
+    const icon = node.isDir ? (isOpen ? "▾ 📂" : "▸ 📁") : isPinned ? "📌" : isImagePath(node.name) ? "🖼" : "📄";
     btn.textContent = `${icon} ${node.name}`;
 
     // Holds a folder's children; filled lazily on first expand.

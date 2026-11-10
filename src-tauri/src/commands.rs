@@ -134,6 +134,15 @@ pub fn read_file(state: State<'_, AppState>, path: String) -> Result<String, Str
     fs::read_to_string(&target).map_err(|e| e.to_string())
 }
 
+/// Raw bytes for the image viewer; same root guard as read_file.
+#[tauri::command]
+pub fn read_file_bytes(state: State<'_, AppState>, path: String) -> Result<tauri::ipc::Response, String> {
+    let root_guard = state.root.lock().map_err(|e| e.to_string())?;
+    let root = root_guard.as_ref().ok_or_else(|| "NO_ROOT".to_string())?;
+    let target = resolve_inside(root, Path::new(&path))?;
+    fs::read(&target).map(tauri::ipc::Response::new).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub fn write_file(state: State<'_, AppState>, path: String, contents: String) -> Result<(), String> {
     let root_guard = state.root.lock().map_err(|e| e.to_string())?;
