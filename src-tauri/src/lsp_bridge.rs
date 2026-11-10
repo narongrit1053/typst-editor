@@ -93,6 +93,11 @@ pub fn lsp_start(
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
 
+    if let Ok(fonts_dir) = crate::commands::ensure_app_fonts(Some(&app)) {
+        cmd.arg("--font-path").arg(&fonts_dir);
+        cmd.env("TYPST_FONT_PATHS", &fonts_dir);
+    }
+
     #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);
 

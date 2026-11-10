@@ -45,14 +45,6 @@ export async function connectLsp(rootPath: string, onExit: () => void): Promise<
 
   const onMessage = new Channel<string>();
   onMessage.onmessage = (msgStr: string) => {
-    for (const h of handlers) {
-      try {
-        h(msgStr);
-      } catch (e) {
-        console.error("LSP transport handler error:", e);
-      }
-    }
-
     try {
       const msg = JSON.parse(msgStr);
       if (msg.id !== undefined && pendingRequests.has(msg.id)) {
@@ -63,6 +55,7 @@ export async function connectLsp(rootPath: string, onExit: () => void): Promise<
         } else {
           resolve(msg.result);
         }
+        return;
       } else if (msg.method) {
         const list = notificationHandlers.get(msg.method);
         if (list) {
@@ -72,6 +65,14 @@ export async function connectLsp(rootPath: string, onExit: () => void): Promise<
         }
       }
     } catch {}
+
+    for (const h of handlers) {
+      try {
+        h(msgStr);
+      } catch (e) {
+        console.error("LSP transport handler error:", e);
+      }
+    }
   };
 
   function rejectPending(reason: string) {
@@ -109,7 +110,7 @@ export async function connectLsp(rootPath: string, onExit: () => void): Promise<
     transport,
     request(method: string, params: unknown): Promise<unknown> {
       return new Promise((resolve, reject) => {
-        const id = nextRequestId++;
+        const id = `lsp-${nextRequestId++}`;
         pendingRequests.set(id, { resolve, reject });
         const body = JSON.stringify({
           jsonrpc: "2.0",

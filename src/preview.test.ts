@@ -85,4 +85,47 @@ describe("preview zoom and controls", () => {
       arguments: ["default_preview"],
     });
   });
+
+  it("throws error when tinymist does not return a valid staticServerPort", async () => {
+    const fakeLsp: LspConnection = {
+      rootPath: "D:/Try/Typst",
+      transport: { send: vi.fn(), subscribe: vi.fn(), unsubscribe: vi.fn() },
+      request: vi.fn().mockResolvedValue({
+        // Missing staticServerPort, e.g. capabilities collision
+        capabilities: {},
+      }),
+      notify: vi.fn(),
+      onNotification: vi.fn(),
+      close: vi.fn(),
+    };
+
+    await expect(startPreview(fakeFrame, fakeLsp, "D:/Try/Typst/paper.typ")).rejects.toThrow(
+      "Tinymist preview failed to return staticServerPort",
+    );
+  });
+
+  it("retries when tinymist returns not initialized error (-32002)", async () => {
+    let callCount = 0;
+    const fakeLsp: LspConnection = {
+      rootPath: "D:/Try/Typst",
+      transport: { send: vi.fn(), subscribe: vi.fn(), unsubscribe: vi.fn() },
+      request: vi.fn().mockImplementation(async (cmd) => {
+        if (cmd === "workspace/executeCommand") {
+          callCount++;
+          if (callCount < 3) {
+            throw { code: -32002, message: "not initialized yet" };
+          }
+          return { staticServerPort: 61234 };
+        }
+        return null;
+      }),
+      notify: vi.fn(),
+      onNotification: vi.fn(),
+      close: vi.fn(),
+    };
+
+    await startPreview(fakeFrame, fakeLsp, "D:/Try/Typst/paper.typ");
+    expect(callCount).toBe(3);
+    expect(fakeFrame.src).toBe("http://127.0.0.1:61234/");
+  });
 });

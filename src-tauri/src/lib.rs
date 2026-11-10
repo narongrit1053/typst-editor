@@ -44,6 +44,7 @@ pub fn run() {
             commands::save_as_my_template,
             commands::list_my_templates,
             commands::use_my_template,
+            commands::get_app_fonts_dir,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

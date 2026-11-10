@@ -92,7 +92,7 @@ export async function startPreview(
 
   try {
     let res: PreviewStartResult | undefined;
-    for (let attempt = 0; attempt < 10; attempt++) {
+    for (let attempt = 0; attempt < 25; attempt++) {
       try {
         res = (await lsp.request("workspace/executeCommand", {
           command: "tinymist.doStartPreview",
@@ -100,16 +100,20 @@ export async function startPreview(
         })) as PreviewStartResult | undefined;
         break;
       } catch (err: any) {
-        if (err?.code === -32002 && attempt < 9) {
-          await new Promise((r) => setTimeout(r, 150));
+        if (err?.code === -32002 && attempt < 24) {
+          await new Promise((r) => setTimeout(r, 200));
           continue;
         }
         throw err;
       }
     }
 
+    if (!res || typeof res.staticServerPort !== "number") {
+      throw new Error(`Tinymist preview failed to return staticServerPort: ${JSON.stringify(res)}`);
+    }
+
     isPreviewRunning = true;
-    const port = res?.staticServerPort || 23625;
+    const port = res.staticServerPort;
     const previewUrl = `http://127.0.0.1:${port}/`;
     await waitForPort(previewUrl);
 

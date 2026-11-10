@@ -329,6 +329,104 @@ pub fn my_templates_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(dir)
 }
 
+const FONT_FILES: &[&str] = &[
+    "texgyretermes-regular.otf",
+    "texgyretermes-bold.otf",
+    "texgyretermes-italic.otf",
+    "texgyretermes-bolditalic.otf",
+];
+
+pub fn app_fonts_dir(app: Option<&AppHandle>) -> Result<PathBuf, String> {
+    if let Some(app_handle) = app {
+        if let Ok(data_dir) = app_handle.path().app_data_dir() {
+            let fonts = data_dir.join("fonts");
+            let _ = fs::create_dir_all(&fonts);
+            return Ok(fonts);
+        }
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            let res_fonts = parent.join("resources").join("fonts");
+            if res_fonts.exists() {
+                return Ok(res_fonts);
+            }
+            let dev_fonts = parent.join("../../tools/fonts");
+            if dev_fonts.exists() {
+                return Ok(dev_fonts);
+            }
+        }
+    }
+    let local = PathBuf::from("tools/fonts");
+    if local.exists() {
+        return Ok(local);
+    }
+    let parent_local = PathBuf::from("../tools/fonts");
+    if parent_local.exists() {
+        return Ok(parent_local);
+    }
+    let temp = std::env::temp_dir().join("typst-editor-fonts");
+    let _ = fs::create_dir_all(&temp);
+    Ok(temp)
+}
+
+pub fn ensure_app_fonts(app: Option<&AppHandle>) -> Result<PathBuf, String> {
+    let dest_dir = app_fonts_dir(app)?;
+
+    let mut missing = Vec::new();
+    for f in FONT_FILES {
+        if !dest_dir.join(f).exists() {
+            missing.push(*f);
+        }
+    }
+
+    if missing.is_empty() {
+        return Ok(dest_dir);
+    }
+
+    let mut search_dirs = Vec::new();
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            search_dirs.push(parent.join("resources").join("fonts"));
+            search_dirs.push(parent.join("tools").join("fonts"));
+            search_dirs.push(parent.join("../../tools/fonts"));
+            search_dirs.push(parent.join("../../../tools/fonts"));
+        }
+    }
+    search_dirs.push(PathBuf::from("tools/fonts"));
+    search_dirs.push(PathBuf::from("../tools/fonts"));
+
+    for f in &missing {
+        let dest = dest_dir.join(f);
+        let mut copied = false;
+        for sdir in &search_dirs {
+            let candidate = sdir.join(f);
+            if candidate.exists() {
+                if fs::copy(&candidate, &dest).is_ok() {
+                    copied = true;
+                    break;
+                }
+            }
+        }
+        if !copied {
+            let url = format!("https://mirrors.ctan.org/fonts/tex-gyre/opentype/{}", f);
+            if let Ok(resp) = ureq::get(&url).timeout(std::time::Duration::from_secs(8)).call() {
+                let mut reader = resp.into_reader();
+                if let Ok(mut file) = fs::File::create(&dest) {
+                    let _ = std::io::copy(&mut reader, &mut file);
+                }
+            }
+        }
+    }
+
+    Ok(dest_dir)
+}
+
+#[tauri::command]
+pub fn get_app_fonts_dir(app: AppHandle) -> Result<String, String> {
+    let dir = ensure_app_fonts(Some(&app))?;
+    Ok(dir.to_string_lossy().to_string())
+}
+
 #[tauri::command]
 pub fn fetch_template_catalog(app: AppHandle) -> Result<String, String> {
     let cache_file = template_cache_path(&app)?;
@@ -485,6 +583,7 @@ pub fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
 
 #[tauri::command]
 pub fn export_file(
+    app: AppHandle,
     state: State<'_, AppState>,
     main: String,
     out: String,
@@ -511,15 +610,18 @@ pub fn export_file(
 
     let font_candidate = root.join("fonts");
     let font_dir = if font_candidate.is_dir() {
-        Some(font_candidate.as_path())
+        Some(font_candidate)
     } else {
-        None
+        ensure_app_fonts(Some(&app)).ok()
     };
 
-    let args = export_args(&main_path, &out_path, root, font_dir);
+    let args = export_args(&main_path, &out_path, root, font_dir.as_deref());
 
     let bin = custom_binary.filter(|s| !s.trim().is_empty()).unwrap_or_else(|| "typst".to_string());
     let mut cmd = Command::new(&bin);
+    if let Ok(app_fonts) = ensure_app_fonts(Some(&app)) {
+        cmd.env("TYPST_FONT_PATHS", &app_fonts);
+    }
     cmd.args(args);
 
     #[cfg(windows)]
@@ -665,6 +767,15 @@ mod tests {
             Some(Path::new("fonts")),
         );
         assert_eq!(&b[5..], ["--font-path", "fonts"].map(OsString::from));
+    }
+
+    #[test]
+    fn test_ensure_app_fonts() {
+        let dir = ensure_app_fonts(None).expect("must resolve font directory");
+        assert!(dir.exists());
+        for f in FONT_FILES {
+            assert!(dir.join(f).exists(), "Font file {} must exist in {:?}", f, dir);
+        }
     }
 
     #[test]

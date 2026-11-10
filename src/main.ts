@@ -254,7 +254,10 @@ export async function setMainFile(path: string | null) {
   const previewFrame = document.getElementById("preview") as HTMLIFrameElement;
   const targetPreview = pinnedFilePath || currentFilePath;
   if (previewFrame && lspConnection && targetPreview) {
-    startPreview(previewFrame, lspConnection, targetPreview).catch(console.error);
+    startPreview(previewFrame, lspConnection, targetPreview).catch((err) => {
+      console.error("Preview start failed:", err);
+      showBanner(`Preview error: ${err?.message || err}`, false);
+    });
   }
 }
 
@@ -780,6 +783,7 @@ export async function openFile(filePath?: string) {
     if (previewFrame && lspConnection) {
       startPreview(previewFrame, lspConnection, targetPreview).catch((err) => {
         console.error("Preview start failed:", err);
+        showBanner(`Preview error: ${err?.message || err}`, false);
       });
     }
 
