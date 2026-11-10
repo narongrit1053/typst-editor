@@ -467,6 +467,11 @@ pub fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
             continue;
         }
 
+        let path = entry.path();
+        if path == dst || dst.starts_with(&path) {
+            continue;
+        }
+
         let dest_child = dst.join(&file_name);
         if file_type.is_dir() {
             fs::create_dir_all(&dest_child).map_err(|e| e.to_string())?;
@@ -731,5 +736,11 @@ mod tests {
         copy_dir_recursive(&src, &dst).unwrap();
         assert!(dst.join("sub/chapter.typ").exists());
         assert_eq!(fs::read_to_string(dst.join("sub/chapter.typ")).unwrap(), "hello");
+
+        // Guard against infinite self-nesting when dst is inside src
+        let nested_dst = src.join("backup");
+        fs::create_dir_all(&nested_dst).unwrap();
+        copy_dir_recursive(&src, &nested_dst).unwrap();
+        assert!(nested_dst.join("sub/chapter.typ").exists());
     }
 }

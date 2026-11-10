@@ -5,9 +5,9 @@ export function formatProblem(p: Problem, rootPath: string): string {
   const normalizedRoot = rootPath.replace(/\\/g, "/").replace(/\/$/, "");
   const normalizedPath = p.path.replace(/\\/g, "/");
 
-  if (normalizedPath.startsWith(normalizedRoot + "/")) {
+  if (normalizedPath.toLowerCase().startsWith(normalizedRoot.toLowerCase() + "/")) {
     rel = normalizedPath.slice(normalizedRoot.length + 1);
-  } else if (normalizedPath === normalizedRoot) {
+  } else if (normalizedPath.toLowerCase() === normalizedRoot.toLowerCase()) {
     rel = normalizedPath.split("/").pop() || normalizedPath;
   }
 

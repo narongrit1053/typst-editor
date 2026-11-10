@@ -1,4 +1,4 @@
-import { LspConnection } from "./lsp";
+import { LspConnection, uriToPath } from "./lsp";
 
 let activeLsp: LspConnection | null = null;
 let isPreviewRunning = false;
@@ -38,7 +38,8 @@ export function initPreviewSync(onJumpToSource?: (file: string, line: number, co
     const data = event.data;
     if (!data || typeof data !== "object") return;
     if (data.type === "jumpTo" || data.event === "editorScrollTo") {
-      const file = data.filepath || data.path || "";
+      const rawFile = data.filepath || data.path || "";
+      const file = rawFile.startsWith("file://") ? uriToPath(rawFile) : rawFile;
       const line = typeof data.line === "number" ? data.line + 1 : 1;
       const col = typeof data.character === "number" ? data.character + 1 : (typeof data.col === "number" ? data.col + 1 : 1);
       onJumpToSource?.(file, line, col);

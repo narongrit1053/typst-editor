@@ -56,6 +56,10 @@ export function getSaver(): Saver | null {
   return saver;
 }
 
+export function normalizePath(p: string | null | undefined): string {
+  return p ? p.replace(/\//g, "\\").toLowerCase() : "";
+}
+
 export function showBanner(message: string, isError = true) {
   const banner = document.getElementById("banner");
   const bannerText = document.getElementById("banner-text");
@@ -200,15 +204,19 @@ export async function refreshFileTree() {
   }
 }
 
-async function collectAllWorkspaceFiles(dir?: string): Promise<string[]> {
+async function collectAllWorkspaceFiles(dir?: string, visited = new Set<string>(), depth = 0): Promise<string[]> {
+  if (depth > 8) return [];
   const results: string[] = [];
   try {
     const raw = await invoke<Array<{ name: string; path: string; is_dir: boolean }>>("list_dir", {
       path: dir,
     });
     for (const item of raw) {
+      const norm = normalizePath(item.path);
+      if (visited.has(norm)) continue;
+      visited.add(norm);
       if (item.is_dir) {
-        const subFiles = await collectAllWorkspaceFiles(item.path);
+        const subFiles = await collectAllWorkspaceFiles(item.path, visited, depth + 1);
         results.push(...subFiles);
       } else {
         results.push(item.path);
@@ -260,12 +268,13 @@ async function deleteItem(path: string) {
 
   try {
     await invoke("delete_path", { path });
-    if (currentFilePath === path) {
+    const normPath = normalizePath(path);
+    if (normalizePath(currentFilePath) === normPath) {
       currentFilePath = null;
       updateFileNameDisplay(null, false);
       editor?.open("", "");
     }
-    if (pinnedFilePath === path) {
+    if (normalizePath(pinnedFilePath) === normPath) {
       await setMainFile(null);
     }
     await refreshFileTree();
@@ -280,15 +289,17 @@ async function renameItem(oldPath: string) {
   if (!newName || newName.trim() === "" || newName === oldName) return;
 
   const parent = oldPath.replace(/[\\/][^\\/]+$/, "");
-  const newPath = `${parent}/${newName.trim()}`;
+  const sep = oldPath.includes("\\") ? "\\" : "/";
+  const newPath = `${parent}${sep}${newName.trim()}`;
 
   try {
     await invoke("rename_path", { oldPath, newPath });
-    if (currentFilePath === oldPath) {
+    const oldNorm = normalizePath(oldPath);
+    if (normalizePath(currentFilePath) === oldNorm) {
       currentFilePath = newPath;
       updateFileNameDisplay(newPath, saver?.isDirty() || false);
     }
-    if (pinnedFilePath === oldPath) {
+    if (normalizePath(pinnedFilePath) === oldNorm) {
       pinnedFilePath = newPath;
       if (currentProjectFolder) {
         const settings = getCachedSettings();
@@ -310,7 +321,8 @@ async function createNewFile() {
   const name = window.prompt("New file name (e.g. chapter1.typ):");
   if (!name || name.trim() === "") return;
 
-  const targetPath = `${currentProjectFolder}/${name.trim()}`;
+  const sep = currentProjectFolder.includes("\\") ? "\\" : "/";
+  const targetPath = `${currentProjectFolder}${sep}${name.trim()}`;
   try {
     await invoke("create_file", { path: targetPath });
     await refreshFileTree();
@@ -328,7 +340,8 @@ async function createNewFolder() {
   const name = window.prompt("New folder name:");
   if (!name || name.trim() === "") return;
 
-  const targetPath = `${currentProjectFolder}/${name.trim()}`;
+  const sep = currentProjectFolder.includes("\\") ? "\\" : "/";
+  const targetPath = `${currentProjectFolder}${sep}${name.trim()}`;
   try {
     await invoke("create_dir", { path: targetPath });
     await refreshFileTree();
@@ -820,7 +833,9 @@ function initApp() {
   const previewFrame = document.getElementById("preview") as HTMLIFrameElement;
 
   initPreviewSync((file, line, col) => {
-    if (file && file !== currentFilePath) {
+    const normFile = normalizePath(file);
+    const normCurrent = normalizePath(currentFilePath);
+    if (normFile && normFile !== normCurrent) {
       openFile(file).then(() => {
         editor?.jumpTo(line, col);
       });

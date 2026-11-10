@@ -14,6 +14,17 @@ describe("problems and status formatting", () => {
     expect(formatProblem(p, "D:\\proj")).toBe("ch\\one.typ:7:39  expected length");
   });
 
+  it("formats problem paths relative to root with case-insensitive drive letter", () => {
+    const p: Problem = {
+      path: "d:\\proj\\ch\\one.typ",
+      line: 7,
+      col: 39,
+      severity: "error",
+      message: "expected length",
+    };
+    expect(formatProblem(p, "D:\\proj")).toBe("ch\\one.typ:7:39  expected length");
+  });
+
   it("summarises diagnostic counts", () => {
     const p: Problem = {
       path: "D:\\proj\\ch\\one.typ",
