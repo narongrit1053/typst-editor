@@ -80,4 +80,20 @@ describe("Template market logic", () => {
     expect(myTemplates.length).toBe(1);
     expect(myTemplates[0].name).toBe("my-custom-report");
   });
+
+  it("only keeps the latest version when multiple versions exist in catalog", () => {
+    const versionedJson = JSON.stringify([
+      { name: "revtyp", version: "0.1.0", description: "old 1", categories: ["paper"], template: { path: "t" } },
+      { name: "revtyp", version: "0.15.0", description: "latest", categories: ["paper"], template: { path: "t" } },
+      { name: "revtyp", version: "0.9.1", description: "old 2", categories: ["paper"], template: { path: "t" } },
+    ]);
+    const list = parseTemplateCatalog(versionedJson);
+    expect(list.length).toBe(1);
+    expect(list[0].name).toBe("revtyp");
+    expect(list[0].version).toBe("0.15.0");
+    expect(list[0].description).toBe("latest");
+    expect(list[0].thumbnailUrl).toBe(
+      "https://packages.typst.org/preview/thumbnails/revtyp-0.15.0.webp",
+    );
+  });
 });

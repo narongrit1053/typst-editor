@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog, save as saveDialog, ask } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
-import { connectLsp, LspConnection, pathToUri } from "./lsp";
+import { connectLsp, LspConnection, pathToUri, uriToPath } from "./lsp";
 import { createEditor, EditorHandle } from "./editor";
 import {
   startPreview,
@@ -371,6 +371,58 @@ export async function refreshOutline() {
   }
 }
 
+let isJumpingFromPreview = false;
+let scrollSyncTimer: any = null;
+
+function syncPreviewToEditor(line: number, col: number) {
+  if (isJumpingFromPreview || !lspConnection || !currentFilePath) return;
+  if (scrollSyncTimer) clearTimeout(scrollSyncTimer);
+  scrollSyncTimer = setTimeout(() => {
+    lspConnection?.request("workspace/executeCommand", {
+      command: "tinymist.scrollPreview",
+      arguments: [
+        "default_preview",
+        {
+          event: "panelScrollTo",
+          filepath: currentFilePath,
+          line: line - 1,
+          character: col - 1,
+        },
+      ],
+    }).catch(() => {});
+  }, 100);
+}
+
+function setupLspHandlers(lsp: LspConnection) {
+  lsp.onNotification("window/showDocument", (params: any) => {
+    if (!params || !params.uri) return;
+    const targetPath = uriToPath(params.uri);
+    const start = params.selection?.start || { line: 0, character: 0 };
+    const end = params.selection?.end || start;
+
+    const sLine = start.line + 1;
+    const sCol = start.character + 1;
+    const eLine = end.line + 1;
+    const eCol = end.character + 1;
+
+    const handleJump = () => {
+      isJumpingFromPreview = true;
+      editor?.jumpToRange(sLine, sCol, eLine, eCol);
+      setTimeout(() => {
+        isJumpingFromPreview = false;
+      }, 250);
+    };
+
+    if (currentFilePath && normalizePath(targetPath) === normalizePath(currentFilePath)) {
+      handleJump();
+    } else {
+      openFile(targetPath).then(() => {
+        handleJump();
+      });
+    }
+  });
+}
+
 function scheduleOutlineRefresh() {
   if (outlineTimer) clearTimeout(outlineTimer);
   outlineTimer = setTimeout(() => {
@@ -393,6 +445,7 @@ async function reconnectLsp() {
     lspConnection = await connectLsp(folder, () => {
       handleLspExit();
     });
+    setupLspHandlers(lspConnection);
 
     const editorEl = document.getElementById("editor")!;
     const currentText = editor
@@ -411,6 +464,7 @@ async function reconnectLsp() {
       if (statusPos) {
         statusPos.textContent = `Ln ${line}, Col ${col}`;
       }
+      syncPreviewToEditor(line, col);
     });
 
     editor.onDiagnostics((problems) => {
@@ -595,6 +649,7 @@ export async function openFolder(folderPath?: string) {
     lspConnection = await connectLsp(targetFolder, () => {
       handleLspExit();
     });
+    setupLspHandlers(lspConnection);
   } catch (e) {
     console.warn("LSP connection error:", e);
   }
@@ -709,6 +764,7 @@ export async function openFile(filePath?: string) {
       lspConnection = await connectLsp(folder, () => {
         handleLspExit();
       });
+      setupLspHandlers(lspConnection);
     } catch (e) {
       console.warn("Failed to connect LSP:", e);
     }
@@ -722,6 +778,7 @@ export async function openFile(filePath?: string) {
       if (statusPos) {
         statusPos.textContent = `Ln ${line}, Col ${col}`;
       }
+      syncPreviewToEditor(line, col);
     });
 
     editor.onDiagnostics((problems) => {

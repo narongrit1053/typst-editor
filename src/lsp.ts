@@ -57,6 +57,12 @@ export async function connectLsp(rootPath: string, onExit: () => void): Promise<
         }
         return;
       } else if (msg.method) {
+        if (msg.id !== undefined) {
+          // Acknowledge server-to-client requests (e.g. window/showDocument)
+          invoke("lsp_send", {
+            message: JSON.stringify({ jsonrpc: "2.0", id: msg.id, result: { success: true } }),
+          }).catch(() => {});
+        }
         const list = notificationHandlers.get(msg.method);
         if (list) {
           for (const cb of list) {
@@ -92,6 +98,16 @@ export async function connectLsp(rootPath: string, onExit: () => void): Promise<
 
   const transport: Transport = {
     send(message: string) {
+      try {
+        const obj = JSON.parse(message);
+        if (obj.method === "initialize") {
+          obj.params = obj.params || {};
+          obj.params.capabilities = obj.params.capabilities || {};
+          obj.params.capabilities.window = obj.params.capabilities.window || {};
+          obj.params.capabilities.window.showDocument = { support: true };
+          message = JSON.stringify(obj);
+        }
+      } catch {}
       invoke("lsp_send", { message }).catch((err) => {
         console.error("Failed to send LSP message:", err);
       });

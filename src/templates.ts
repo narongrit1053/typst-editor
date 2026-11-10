@@ -27,12 +27,24 @@ const TEMPLATE_CATEGORIES = new Set([
   "office",
 ]);
 
+export function compareSemver(v1: string, v2: string): number {
+  const p1 = (v1 || "0").split(".").map((x) => parseInt(x, 10) || 0);
+  const p2 = (v2 || "0").split(".").map((x) => parseInt(x, 10) || 0);
+  const len = Math.max(p1.length, p2.length);
+  for (let i = 0; i < len; i++) {
+    const num1 = p1[i] ?? 0;
+    const num2 = p2[i] ?? 0;
+    if (num1 !== num2) return num1 - num2;
+  }
+  return 0;
+}
+
 export function parseTemplateCatalog(jsonStr: string): TypstTemplate[] {
   try {
     const raw = JSON.parse(jsonStr);
     if (!Array.isArray(raw)) return [];
 
-    const templates: TypstTemplate[] = [];
+    const templatesMap = new Map<string, TypstTemplate>();
     for (const item of raw) {
       if (!item || !item.name) continue;
 
@@ -54,7 +66,7 @@ export function parseTemplateCatalog(jsonStr: string): TypstTemplate[] {
           displayCat = cats[0].charAt(0).toUpperCase() + cats[0].slice(1);
         }
 
-        templates.push({
+        const candidate: TypstTemplate = {
           name: item.name,
           version: item.version || "0.1.0",
           description: item.description || "No description provided",
@@ -65,10 +77,15 @@ export function parseTemplateCatalog(jsonStr: string): TypstTemplate[] {
           thumbnailUrl: hasTemplate
             ? `https://packages.typst.org/preview/thumbnails/${item.name}-${item.version || "0.1.0"}.webp`
             : undefined,
-        });
+        };
+
+        const existing = templatesMap.get(item.name);
+        if (!existing || compareSemver(candidate.version, existing.version) > 0) {
+          templatesMap.set(item.name, candidate);
+        }
       }
     }
-    return templates;
+    return Array.from(templatesMap.values());
   } catch {
     return [];
   }

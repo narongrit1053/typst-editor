@@ -7,7 +7,7 @@ describe("preview zoom and controls", () => {
 
   beforeEach(() => {
     fakeFrame = {
-      style: { zoom: "1" },
+      style: {} as any,
       src: "",
       contentWindow: {
         location: { reload: vi.fn() },
@@ -21,7 +21,7 @@ describe("preview zoom and controls", () => {
 
     zoomIn(fakeFrame);
     expect(getZoom()).toBe(1.1);
-    expect(fakeFrame.style.zoom).toBe("1.1");
+    expect(fakeFrame.style.transform).toBe("scale(1.1)");
 
     zoomOut(fakeFrame);
     expect(getZoom()).toBe(1.0);

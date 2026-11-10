@@ -42,6 +42,7 @@ export interface EditorHandle {
   onChange(cb: () => void): void;
   onCursor(cb: (line: number, col: number) => void): void;
   jumpTo(line: number, col: number): void;
+  jumpToRange(startLine: number, startCol: number, endLine?: number, endCol?: number): void;
   onDiagnostics(cb: (d: Problem[]) => void): void;
   destroy(): void;
 }
@@ -182,19 +183,31 @@ export function createEditor(parent: HTMLElement, lsp: LspConnection | null): Ed
       cursorCallbacks.push(cb);
     },
 
-    jumpTo(line: number, col: number) {
+    jumpToRange(startLine: number, startCol: number, endLine?: number, endCol?: number) {
       if (!view) return;
       const doc = view.state.doc;
-      const targetLine = Math.max(1, Math.min(doc.lines, line));
-      const lineObj = doc.line(targetLine);
-      const targetCol = Math.max(1, Math.min(lineObj.length + 1, col));
-      const pos = lineObj.from + targetCol - 1;
+      const sLine = Math.max(1, Math.min(doc.lines, startLine));
+      const sLineObj = doc.line(sLine);
+      const sCol = Math.max(1, Math.min(sLineObj.length + 1, startCol));
+      const anchor = sLineObj.from + sCol - 1;
+
+      let head = anchor;
+      if (typeof endLine === "number" && typeof endCol === "number") {
+        const eLine = Math.max(1, Math.min(doc.lines, endLine));
+        const eLineObj = doc.line(eLine);
+        const eCol = Math.max(1, Math.min(eLineObj.length + 1, endCol));
+        head = eLineObj.from + eCol - 1;
+      }
 
       view.dispatch({
-        selection: { anchor: pos, head: pos },
+        selection: { anchor, head },
         scrollIntoView: true,
       });
       view.focus();
+    },
+
+    jumpTo(line: number, col: number) {
+      this.jumpToRange(line, col, line, col);
     },
 
     onDiagnostics(cb: (d: Problem[]) => void) {

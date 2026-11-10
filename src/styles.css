@@ -404,6 +404,7 @@ html, body {
   overflow: hidden;
   background: var(--code-bg);
   position: relative;
+  contain: strict;
 }
 
 .preview-frame {
@@ -412,6 +413,7 @@ html, body {
   border: 0;
   display: block;
   background: var(--code-bg);
+  will-change: transform;
 }
 
 /* Problems panel */
@@ -504,6 +506,74 @@ html, body {
   height: 100%;
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: var(--editor-font-size, 13.5px);
+}
+
+/* CodeMirror autocomplete & tooltips */
+.cm-tooltip {
+  background: var(--panel) !important;
+  color: var(--ink) !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35) !important;
+  font-family: "Cascadia Code", Consolas, monospace !important;
+}
+
+.cm-tooltip-autocomplete {
+  background: var(--panel) !important;
+  border: 1px solid var(--line) !important;
+}
+
+.cm-tooltip-autocomplete ul {
+  font-family: "Cascadia Code", Consolas, monospace !important;
+  font-size: var(--editor-font-size, 13px) !important;
+  padding: 3px 0 !important;
+}
+
+.cm-tooltip-autocomplete ul li {
+  color: var(--ink) !important;
+  padding: 3px 8px !important;
+  line-height: 1.4 !important;
+}
+
+.cm-tooltip-autocomplete ul li[aria-selected] {
+  background: var(--accent) !important;
+  color: #ffffff !important;
+}
+
+.cm-tooltip-autocomplete ul li[aria-selected] .cm-completionDetail,
+.cm-tooltip-autocomplete ul li[aria-selected] .cm-completionIcon,
+.cm-tooltip-autocomplete ul li[aria-selected] .cm-completionMatchedText {
+  color: #ffffff !important;
+  opacity: 1 !important;
+}
+
+.cm-completionDetail {
+  color: var(--muted) !important;
+  font-style: italic;
+  font-size: 0.88em;
+  margin-left: 8px;
+}
+
+.cm-completionIcon {
+  color: var(--accent) !important;
+  opacity: 0.85;
+  margin-right: 6px;
+}
+
+.cm-completionMatchedText {
+  color: var(--accent) !important;
+  text-decoration: underline;
+  font-weight: 600;
+}
+
+.cm-tooltip.cm-completionInfo {
+  background: var(--panel) !important;
+  color: var(--ink) !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 6px !important;
+  padding: 8px 12px !important;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif !important;
+  font-size: 13px !important;
 }
 
 /* Modal styles */

@@ -17,7 +17,20 @@ export function getZoom(): number {
 
 export function setZoom(frame: HTMLIFrameElement, zoom: number): number {
   currentZoom = Math.max(0.5, Math.min(2.5, Math.round(zoom * 10) / 10));
-  (frame.style as any).zoom = String(currentZoom);
+  if (frame && frame.style) {
+    if (currentZoom === 1.0) {
+      frame.style.transform = "";
+      frame.style.width = "100%";
+      frame.style.height = "100%";
+      frame.style.transformOrigin = "";
+    } else {
+      frame.style.transformOrigin = "top left";
+      frame.style.transform = `scale(${currentZoom})`;
+      frame.style.width = `${100 / currentZoom}%`;
+      frame.style.height = `${100 / currentZoom}%`;
+    }
+    (frame.style as any).zoom = "";
+  }
   return currentZoom;
 }
 
@@ -126,8 +139,8 @@ export async function startPreview(
     } else {
       frame.src = previewUrl;
     }
-    // Apply current zoom
-    (frame.style as any).zoom = String(currentZoom);
+    // Apply current zoom via GPU-accelerated transform
+    setZoom(frame, currentZoom);
   } catch (err) {
     console.error("Failed to start preview:", err);
     throw err;
