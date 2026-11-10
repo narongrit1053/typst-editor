@@ -3,6 +3,7 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 
 import { connectLsp, LspConnection } from "./lsp";
 import { createEditor, EditorHandle } from "./editor";
+import { startPreview, stopPreview } from "./preview";
 
 let lspConnection: LspConnection | null = null;
 let editor: EditorHandle | null = null;
@@ -14,6 +15,10 @@ export function getCurrentFilePath(): string | null {
 
 export function getCurrentEditor(): EditorHandle | null {
   return editor;
+}
+
+export function getLspConnection(): LspConnection | null {
+  return lspConnection;
 }
 
 function initSplitter() {
@@ -68,6 +73,7 @@ export async function openFile(filePath?: string) {
   }
 
   const folder = targetPath.replace(/[\\/][^\\/]+$/, "") || ".";
+  await stopPreview();
   await invoke("set_root", { path: folder });
 
   if (lspConnection) {
@@ -93,6 +99,13 @@ export async function openFile(filePath?: string) {
   currentFilePath = targetPath;
   editor.open(targetPath, content);
 
+  const previewFrame = document.getElementById("preview") as HTMLIFrameElement;
+  if (previewFrame && lspConnection) {
+    startPreview(previewFrame, lspConnection, targetPath).catch((err) => {
+      console.error("Preview start failed:", err);
+    });
+  }
+
   const fileNameEl = document.getElementById("file-name");
   if (fileNameEl) {
     const baseName = targetPath.split(/[\\/]/).pop() || targetPath;
@@ -116,5 +129,9 @@ window.addEventListener("DOMContentLoaded", () => {
       e.preventDefault();
       openFile().catch(console.error);
     }
+  });
+
+  window.addEventListener("beforeunload", () => {
+    stopPreview().catch(() => {});
   });
 });
