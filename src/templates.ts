@@ -11,6 +11,7 @@ export interface TypstTemplate {
   license?: string;
   category: string;
   isLocal?: boolean;
+  thumbnailUrl?: string;
 }
 
 const TEMPLATE_CATEGORIES = new Set([
@@ -61,6 +62,9 @@ export function parseTemplateCatalog(jsonStr: string): TypstTemplate[] {
           license: item.license,
           category: displayCat,
           isLocal: false,
+          thumbnailUrl: hasTemplate
+            ? `https://packages.typst.org/preview/thumbnails/${item.name}-${item.version || "0.1.0"}.webp`
+            : undefined,
         });
       }
     }
@@ -218,7 +222,23 @@ function renderGrid(onOpenProject: (path: string) => void, query: string) {
     // Aspect-ratio 210/297 (A4 paper simulation)
     const previewBox = document.createElement("div");
     previewBox.className = "template-thumbnail";
-    previewBox.innerHTML = `<span class="template-thumb-badge">${t.category}</span>`;
+
+    if (t.thumbnailUrl) {
+      const img = document.createElement("img");
+      img.className = "template-thumbnail-img";
+      img.src = t.thumbnailUrl;
+      img.alt = t.name;
+      img.loading = "lazy";
+      img.onerror = () => {
+        img.remove();
+      };
+      previewBox.appendChild(img);
+    }
+
+    const badge = document.createElement("span");
+    badge.className = "template-thumb-badge";
+    badge.textContent = t.category;
+    previewBox.appendChild(badge);
 
     const title = document.createElement("div");
     title.className = "template-card-title";
@@ -296,6 +316,7 @@ function showTemplateDetailsModal(t: TypstTemplate, onOpenProject: (path: string
   const metaEl = document.getElementById("template-detail-meta");
   const descEl = document.getElementById("template-detail-desc");
   const authorEl = document.getElementById("template-detail-author");
+  const previewEl = document.getElementById("template-detail-preview") as HTMLImageElement | null;
   const btnUse = document.getElementById("btn-template-detail-use");
   const btnClose = document.getElementById("btn-template-detail-close");
 
@@ -304,6 +325,15 @@ function showTemplateDetailsModal(t: TypstTemplate, onOpenProject: (path: string
   if (descEl) descEl.textContent = t.description;
   if (authorEl) {
     authorEl.textContent = t.authors && t.authors.length > 0 ? `Author(s): ${t.authors.join(", ")}` : "";
+  }
+  if (previewEl) {
+    if (t.thumbnailUrl) {
+      previewEl.src = t.thumbnailUrl;
+      previewEl.classList.remove("hidden");
+    } else {
+      previewEl.classList.add("hidden");
+      previewEl.src = "";
+    }
   }
 
   modal.classList.remove("hidden");

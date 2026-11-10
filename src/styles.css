@@ -736,6 +736,7 @@ html, body {
   align-items: center;
   justify-content: center;
   position: relative;
+  overflow: hidden;
 }
 
 .template-thumb-badge {
@@ -747,6 +748,38 @@ html, body {
   padding: 2px 6px;
   border-radius: 4px;
   border: 1px solid var(--line);
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.template-thumbnail-img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #ffffff;
+  z-index: 1;
+  transition: transform 0.15s ease;
+}
+
+.template-card:hover .template-thumbnail-img {
+  transform: scale(1.02);
+}
+
+.template-detail-banner {
+  aspect-ratio: 210 / 140;
+  max-height: 200px;
+  width: 100%;
+  object-fit: contain;
+  background: #ffffff;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  margin-bottom: 12px;
 }
 
 .template-card-title {

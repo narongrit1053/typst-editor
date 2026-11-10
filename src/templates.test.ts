@@ -40,6 +40,16 @@ describe("Template market logic", () => {
     expect(list.map((t) => t.name)).not.toContain("utility-math-calc");
   });
 
+  it("extracts thumbnailUrl for packages with a template field", () => {
+    const list = parseTemplateCatalog(sampleJson);
+    const ieee = list.find((t) => t.name === "charged-ieee");
+    expect(ieee?.thumbnailUrl).toBe(
+      "https://packages.typst.org/preview/thumbnails/charged-ieee-0.1.3.webp",
+    );
+    const thesis = list.find((t) => t.name === "oxford-thesis");
+    expect(thesis?.thumbnailUrl).toBeUndefined();
+  });
+
   it("filters templates by category", () => {
     const list = parseTemplateCatalog(sampleJson);
     const cvs = filterTemplates(list, "CV", "");
