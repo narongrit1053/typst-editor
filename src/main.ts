@@ -302,7 +302,10 @@ async function renameItem(oldPath: string) {
 }
 
 async function createNewFile() {
-  if (!currentProjectFolder) return;
+  if (!currentProjectFolder) {
+    showBanner("Please open a project folder first to create files.", false);
+    return;
+  }
   const name = window.prompt("New file name (e.g. chapter1.typ):");
   if (!name || name.trim() === "") return;
 
@@ -317,7 +320,10 @@ async function createNewFile() {
 }
 
 async function createNewFolder() {
-  if (!currentProjectFolder) return;
+  if (!currentProjectFolder) {
+    showBanner("Please open a project folder first to create folders.", false);
+    return;
+  }
   const name = window.prompt("New folder name:");
   if (!name || name.trim() === "") return;
 
@@ -451,7 +457,10 @@ async function handleLspExit() {
 
 export async function exportDocument(format: "pdf" | "png" | "svg" = "pdf") {
   const targetExport = pinnedFilePath || currentFilePath;
-  if (!targetExport) return;
+  if (!targetExport) {
+    showBanner("Please open a document first to export.", false);
+    return;
+  }
 
   if (saver) {
     try {
@@ -769,9 +778,31 @@ window.addEventListener("DOMContentLoaded", async () => {
     });
   });
 
+  // Welcome screen buttons
+  const welcomeBtnOpenFolder = document.getElementById("welcome-btn-open-folder");
+  welcomeBtnOpenFolder?.addEventListener("click", () => {
+    openFolder().catch(console.error);
+  });
+
+  const welcomeBtnOpenFile = document.getElementById("welcome-btn-open-file");
+  welcomeBtnOpenFile?.addEventListener("click", () => {
+    openFile().catch(console.error);
+  });
+
+  const welcomeBtnTemplates = document.getElementById("welcome-btn-templates");
+  welcomeBtnTemplates?.addEventListener("click", () => {
+    openTemplateMarket(async (targetDir) => {
+      await openFolder(targetDir);
+    });
+  });
+
   // Format button
   const btnFormat = document.getElementById("btn-format");
   btnFormat?.addEventListener("click", () => {
+    if (!currentFilePath) {
+      showBanner("Open a .typ document first to format it.", false);
+      return;
+    }
     editor?.format();
   });
 

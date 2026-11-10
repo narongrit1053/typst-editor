@@ -141,6 +141,7 @@ export function createEditor(parent: HTMLElement, lsp: LspConnection): EditorHan
       if (view) {
         view.destroy();
       }
+      parent.replaceChildren();
 
       const state = EditorState.create({
         doc: text,

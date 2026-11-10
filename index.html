@@ -29,13 +29,13 @@
             <button id="btn-zoom-reset" class="btn btn-sm" title="Reset Zoom (Ctrl+0)">100%</button>
             <button id="btn-zoom-in" class="btn btn-sm" title="Zoom In (Ctrl++)">+</button>
           </div>
-          <div class="export-dropdown-wrap" style="position: relative; display: inline-flex;">
-            <button id="btn-export" class="btn btn-primary" title="Export PDF (Ctrl+E)">Export</button>
-            <button id="btn-export-options" class="btn btn-primary" style="padding: 3px 6px; border-left: 1px solid rgba(255,255,255,0.3);" title="Export Options">▾</button>
-            <div id="export-menu" class="dropdown-menu hidden" style="position: absolute; right: 0; top: 100%; margin-top: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow); z-index: 100; min-width: 160px; display: flex; flex-direction: column;">
-              <button id="btn-export-pdf" class="btn" style="border: none; text-align: left; padding: 6px 12px; border-radius: 0;">Export PDF (.pdf)</button>
-              <button id="btn-export-png" class="btn" style="border: none; text-align: left; padding: 6px 12px; border-radius: 0;">Export PNG (.png)</button>
-              <button id="btn-export-svg" class="btn" style="border: none; text-align: left; padding: 6px 12px; border-radius: 0;">Export SVG (.svg)</button>
+          <div class="export-dropdown-wrap">
+            <button id="btn-export" class="btn" title="Export PDF (Ctrl+E)">Export</button>
+            <button id="btn-export-options" class="btn" style="padding: 3px 6px; border-left: none; border-top-left-radius: 0; border-bottom-left-radius: 0;" title="Export Options">▾</button>
+            <div id="export-menu" class="dropdown-menu hidden">
+              <button id="btn-export-pdf" class="dropdown-item">Export PDF (.pdf)</button>
+              <button id="btn-export-png" class="dropdown-item">Export PNG (.png)</button>
+              <button id="btn-export-svg" class="dropdown-item">Export SVG (.svg)</button>
             </div>
           </div>
           <button id="btn-settings" class="btn btn-icon" title="Settings">⚙</button>
@@ -62,7 +62,17 @@
           </div>
         </aside>
 
-        <div id="editor" class="editor-pane"></div>
+        <div id="editor" class="editor-pane">
+          <div id="editor-welcome" class="editor-welcome">
+            <h2 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 600;">Typst-Editor by Kong</h2>
+            <p style="color: var(--muted); margin: 0 0 20px 0; font-size: 13.5px;">A fast, standalone desktop editor with live preview for Typst documents.</p>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
+              <button id="welcome-btn-open-folder" class="btn btn-primary">Open Folder...</button>
+              <button id="welcome-btn-open-file" class="btn">Open File...</button>
+              <button id="welcome-btn-templates" class="btn">Explore Templates</button>
+            </div>
+          </div>
+        </div>
         <div id="splitter" class="splitter" role="separator" aria-orientation="vertical" tabindex="0"></div>
         <div class="preview-pane">
           <iframe id="preview" class="preview-frame" title="Preview"></iframe>
