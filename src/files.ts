@@ -35,6 +35,9 @@ export async function fetchDirectoryEntries(subPath?: string): Promise<FileNode[
   return sortFileNodes(nodes);
 }
 
+// Folders the user has expanded; survives tree refreshes (create/rename/delete).
+const expandedDirs = new Set<string>();
+
 export function renderFileTree(
   container: HTMLElement,
   entries: FileNode[],
@@ -57,6 +60,20 @@ export function renderFileTree(
     return;
   }
 
+  renderNodes(container, entries, 0, activePath, pinnedPath, onSelect, onPin, onDelete, onRename);
+}
+
+function renderNodes(
+  container: HTMLElement,
+  entries: FileNode[],
+  depth: number,
+  activePath: string | null,
+  pinnedPath: string | null,
+  onSelect: (path: string) => void,
+  onPin: (path: string) => void,
+  onDelete: (path: string) => void,
+  onRename: (path: string) => void,
+): void {
   for (const node of entries) {
     const row = document.createElement("div");
     row.className = "tree-item-row";
@@ -64,6 +81,7 @@ export function renderFileTree(
     row.style.alignItems = "center";
     row.style.justifyContent = "space-between";
     row.style.padding = "2px 6px";
+    row.style.paddingLeft = `${6 + depth * 14}px`;
     row.style.borderRadius = "4px";
 
     const btn = document.createElement("button");
@@ -79,11 +97,37 @@ export function renderFileTree(
       btn.classList.add("active");
     }
 
-    const icon = node.isDir ? "📁" : isPinned ? "📌" : "📄";
+    const isOpen = node.isDir && expandedDirs.has(node.path);
+    const icon = node.isDir ? (isOpen ? "▾ 📂" : "▸ 📁") : isPinned ? "📌" : "📄";
     btn.textContent = `${icon} ${node.name}`;
 
+    // Holds a folder's children; filled lazily on first expand.
+    const childBox = document.createElement("div");
+
+    const renderChildren = async () => {
+      try {
+        const children = await fetchDirectoryEntries(node.path);
+        childBox.replaceChildren();
+        renderNodes(childBox, children, depth + 1, activePath, pinnedPath, onSelect, onPin, onDelete, onRename);
+      } catch (err) {
+        console.warn("Failed to list folder:", err);
+      }
+    };
+
     btn.addEventListener("click", () => {
-      onSelect(node.path);
+      if (!node.isDir) {
+        onSelect(node.path);
+        return;
+      }
+      if (expandedDirs.has(node.path)) {
+        expandedDirs.delete(node.path);
+        childBox.replaceChildren();
+        btn.textContent = `▸ 📁 ${node.name}`;
+      } else {
+        expandedDirs.add(node.path);
+        btn.textContent = `▾ 📂 ${node.name}`;
+        renderChildren();
+      }
     });
 
     // Right-click / contextmenu for setting as main file
@@ -145,5 +189,7 @@ export function renderFileTree(
 
     row.appendChild(actions);
     container.appendChild(row);
+    container.appendChild(childBox);
+    if (isOpen) renderChildren();
   }
 }
