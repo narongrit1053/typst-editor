@@ -447,7 +447,7 @@ async function handleLspExit() {
   }
 }
 
-export async function exportPdf() {
+export async function exportDocument(format: "pdf" | "png" | "svg" = "pdf") {
   const targetExport = pinnedFilePath || currentFilePath;
   if (!targetExport) return;
 
@@ -460,30 +460,47 @@ export async function exportPdf() {
     }
   }
 
-  const defaultPdfPath = targetExport.replace(/\.[^/\\.]+$/, "") + ".pdf";
+  const defaultExt = format;
+  const defaultPath = targetExport.replace(/\.[^/\\.]+$/, "") + `.${defaultExt}`;
+  const filterName = format === "pdf" ? "PDF Document" : format === "png" ? "PNG Image" : "SVG Image";
   const outPath = await saveDialog({
-    defaultPath: defaultPdfPath,
-    filters: [{ name: "PDF Document", extensions: ["pdf"] }],
+    defaultPath,
+    filters: [{ name: filterName, extensions: [defaultExt] }],
   });
 
   if (!outPath || typeof outPath !== "string") return;
 
   const statusState = document.getElementById("status-state");
+  const settings = getCachedSettings();
   try {
-    await invoke("export_pdf", { main: targetExport, out: outPath });
+    await invoke("export_file", {
+      main: targetExport,
+      out: outPath,
+      customBinary: settings.customTypstPath || null,
+    });
     hideBanner();
-    const pdfName = outPath.split(/[\\/]/).pop() || outPath;
+    const fileName = outPath.split(/[\\/]/).pop() || outPath;
     if (statusState) {
-      statusState.textContent = `Exported ${pdfName}`;
+      statusState.textContent = `Exported ${fileName}`;
     }
   } catch (err: any) {
     const msg = String(err);
     if (msg.includes("TYPST_NOT_FOUND")) {
-      showBanner("Typst was not found. Install it (winget install Typst.Typst) and restart the app.");
+      showBannerWithAction(
+        "Typst CLI was not detected. Please install it (winget install Typst.Typst) or configure the path in Settings.",
+        "Settings",
+        () => {
+          document.getElementById("modal-settings")?.classList.remove("hidden");
+        },
+      );
     } else {
       showBanner(`Export failed: ${msg}`);
     }
   }
+}
+
+export async function exportPdf() {
+  return exportDocument("pdf");
 }
 
 export async function openFolder(folderPath?: string) {
@@ -744,11 +761,66 @@ window.addEventListener("DOMContentLoaded", async () => {
     editor?.format();
   });
 
-  // Export button
+  // Export dropdown
   const btnExport = document.getElementById("btn-export");
+  const btnExportOptions = document.getElementById("btn-export-options");
+  const exportMenu = document.getElementById("export-menu");
+  const btnExportPdf = document.getElementById("btn-export-pdf");
+  const btnExportPng = document.getElementById("btn-export-png");
+  const btnExportSvg = document.getElementById("btn-export-svg");
+
   btnExport?.addEventListener("click", () => {
-    exportPdf().catch(console.error);
+    exportDocument("pdf").catch(console.error);
   });
+
+  btnExportOptions?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    exportMenu?.classList.toggle("hidden");
+  });
+
+  btnExportPdf?.addEventListener("click", () => {
+    exportMenu?.classList.add("hidden");
+    exportDocument("pdf").catch(console.error);
+  });
+
+  btnExportPng?.addEventListener("click", () => {
+    exportMenu?.classList.add("hidden");
+    exportDocument("png").catch(console.error);
+  });
+
+  btnExportSvg?.addEventListener("click", () => {
+    exportMenu?.classList.add("hidden");
+    exportDocument("svg").catch(console.error);
+  });
+
+  document.addEventListener("click", (e) => {
+    if (exportMenu && !exportMenu.classList.contains("hidden")) {
+      if (!exportMenu.contains(e.target as Node) && e.target !== btnExportOptions) {
+        exportMenu.classList.add("hidden");
+      }
+    }
+  });
+
+  // First-run Typst check
+  try {
+    const settings = getCachedSettings();
+    invoke<string>("check_typst", { customBinary: settings.customTypstPath || null })
+      .then((ver) => {
+        const verEl = document.getElementById("status-typst-ver");
+        if (verEl) {
+          verEl.textContent = ver.split(" ")[1] ? `Typst ${ver.split(" ")[1]}` : ver;
+        }
+      })
+      .catch(() => {
+        showBannerWithAction(
+          "Typst CLI was not found. Export requires Typst. Install via winget or configure in Settings.",
+          "Settings",
+          () => {
+            document.getElementById("modal-settings")?.classList.remove("hidden");
+          },
+        );
+      });
+  } catch {}
 
   // Global key shortcuts
   window.addEventListener("keydown", (e) => {

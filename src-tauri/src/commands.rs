@@ -201,12 +201,42 @@ pub fn save_app_settings(app: AppHandle, settings_json: String) -> Result<(), St
 }
 
 #[tauri::command]
-pub fn export_pdf(state: State<'_, AppState>, main: String, out: String) -> Result<(), String> {
+pub fn check_typst(custom_binary: Option<String>) -> Result<String, String> {
+    let bin = custom_binary.filter(|s| !s.trim().is_empty()).unwrap_or_else(|| "typst".to_string());
+    let mut cmd = Command::new(&bin);
+    cmd.arg("--version");
+
+    #[cfg(windows)]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+
+    let output = cmd.output().map_err(|e| {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            "TYPST_NOT_FOUND".to_string()
+        } else {
+            e.to_string()
+        }
+    })?;
+
+    if output.status.success() {
+        let ver = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        Ok(ver)
+    } else {
+        Err(format!("typst check failed with exit code {}", output.status))
+    }
+}
+
+#[tauri::command]
+pub fn export_file(
+    state: State<'_, AppState>,
+    main: String,
+    out: String,
+    custom_binary: Option<String>,
+) -> Result<(), String> {
     let root_guard = state.root.lock().map_err(|e| e.to_string())?;
     let root = root_guard.as_ref().ok_or_else(|| "NO_ROOT".to_string())?;
 
     let main_path = resolve_inside(root, Path::new(&main))?;
-    let out_path = PathBuf::from(out);
+    let out_path = PathBuf::from(&out);
 
     let font_candidate = root.join("fonts");
     let font_dir = if font_candidate.is_dir() {
@@ -217,7 +247,8 @@ pub fn export_pdf(state: State<'_, AppState>, main: String, out: String) -> Resu
 
     let args = export_args(&main_path, &out_path, root, font_dir);
 
-    let mut cmd = Command::new("typst");
+    let bin = custom_binary.filter(|s| !s.trim().is_empty()).unwrap_or_else(|| "typst".to_string());
+    let mut cmd = Command::new(&bin);
     cmd.args(args);
 
     #[cfg(windows)]
@@ -241,6 +272,11 @@ pub fn export_pdf(state: State<'_, AppState>, main: String, out: String) -> Resu
     }
 
     Ok(())
+}
+
+#[tauri::command]
+pub fn export_pdf(state: State<'_, AppState>, main: String, out: String) -> Result<(), String> {
+    export_file(state, main, out, None)
 }
 
 #[cfg(test)]
@@ -349,5 +385,16 @@ mod tests {
         // path traversal attempt is blocked by resolve_inside
         let outside = resolve_inside(&root, &root.join("../escaped.typ"));
         assert_eq!(outside, Err("OUTSIDE_ROOT".into()));
+    }
+
+    #[test]
+    fn test_check_typst() {
+        assert_eq!(
+            check_typst(Some("non_existent_binary_foo_bar_xyz".to_string())),
+            Err("TYPST_NOT_FOUND".into())
+        );
+        if let Ok(ver) = check_typst(None) {
+            assert!(ver.contains("typst"));
+        }
     }
 }

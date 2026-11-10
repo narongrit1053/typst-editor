@@ -6,6 +6,7 @@ export interface AppSettings {
   autosave: boolean;
   recentFolders: string[];
   mainPins: Record<string, string>;
+  customTypstPath?: string;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -14,6 +15,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   autosave: true,
   recentFolders: [],
   mainPins: {},
+  customTypstPath: "",
 };
 
 export function mergeSettings(jsonStr: string): AppSettings {
@@ -31,6 +33,7 @@ export function mergeSettings(jsonStr: string): AppSettings {
         typeof parsed.mainPins === "object" && parsed.mainPins !== null
           ? parsed.mainPins
           : DEFAULT_SETTINGS.mainPins,
+      customTypstPath: typeof parsed.customTypstPath === "string" ? parsed.customTypstPath : "",
     };
   } catch {
     return { ...DEFAULT_SETTINGS };
@@ -91,6 +94,7 @@ export function initSettingsModal(): void {
   const selectTheme = document.getElementById("setting-theme") as HTMLSelectElement | null;
   const inputFontSize = document.getElementById("setting-fontsize") as HTMLInputElement | null;
   const checkAutosave = document.getElementById("setting-autosave") as HTMLInputElement | null;
+  const inputTypstPath = document.getElementById("setting-typst-path") as HTMLInputElement | null;
 
   if (!modal || !btnSettings || !btnCancel || !btnSave) return;
 
@@ -98,6 +102,7 @@ export function initSettingsModal(): void {
     if (selectTheme) selectTheme.value = cachedSettings.theme;
     if (inputFontSize) inputFontSize.value = String(cachedSettings.fontSize);
     if (checkAutosave) checkAutosave.checked = cachedSettings.autosave;
+    if (inputTypstPath) inputTypstPath.value = cachedSettings.customTypstPath || "";
     modal.classList.remove("hidden");
   });
 
@@ -109,12 +114,14 @@ export function initSettingsModal(): void {
     const theme = (selectTheme?.value as "light" | "dark" | "system") || "system";
     const fontSize = parseFloat(inputFontSize?.value || "13.5") || 13.5;
     const autosave = checkAutosave ? checkAutosave.checked : true;
+    const customTypstPath = inputTypstPath?.value.trim() || "";
 
     await saveSettings({
       ...cachedSettings,
       theme,
       fontSize,
       autosave,
+      customTypstPath,
     });
     modal.classList.add("hidden");
   });

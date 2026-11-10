@@ -2,7 +2,7 @@ use std::io::BufReader;
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, Stdio};
 use tauri::ipc::Channel;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::lsp_frame::{read_message, write_message};
 use crate::AppState;
@@ -24,10 +24,18 @@ pub fn stop_process(lsp_opt: &mut Option<LspProcess>) {
     }
 }
 
-pub fn tinymist_path() -> PathBuf {
+pub fn tinymist_path(app: Option<&AppHandle>) -> PathBuf {
     if let Ok(env_path) = std::env::var("TYPST_EDITOR_TINYMIST") {
         if !env_path.is_empty() {
             return PathBuf::from(env_path);
+        }
+    }
+    if let Some(app_handle) = app {
+        if let Ok(res_dir) = app_handle.path().resource_dir() {
+            let res_cand = res_dir.join("tinymist.exe");
+            if res_cand.exists() {
+                return res_cand;
+            }
         }
     }
     if let Ok(exe) = std::env::current_exe() {
@@ -35,6 +43,10 @@ pub fn tinymist_path() -> PathBuf {
             let candidate = dir.join("tinymist.exe");
             if candidate.exists() {
                 return candidate;
+            }
+            let sub = dir.join("resources").join("tinymist.exe");
+            if sub.exists() {
+                return sub;
             }
         }
     }
@@ -54,7 +66,7 @@ pub fn lsp_start(
     let mut lsp_guard = state.lsp.lock().map_err(|e| e.to_string())?;
     stop_process(&mut lsp_guard);
 
-    let bin = tinymist_path();
+    let bin = tinymist_path(Some(&app));
     let mut cmd = Command::new(&bin);
     cmd.arg("lsp")
         .stdin(Stdio::piped())
@@ -126,7 +138,7 @@ mod tests {
 
     #[test]
     fn test_tinymist_path_finds_local_tools() {
-        let path = tinymist_path();
+        let path = tinymist_path(None);
         assert!(path.to_string_lossy().contains("tinymist"));
     }
 }

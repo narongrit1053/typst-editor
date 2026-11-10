@@ -28,7 +28,15 @@
             <button id="btn-zoom-reset" class="btn btn-sm" title="Reset Zoom (Ctrl+0)">100%</button>
             <button id="btn-zoom-in" class="btn btn-sm" title="Zoom In (Ctrl++)">+</button>
           </div>
-          <button id="btn-export" class="btn btn-primary" title="Export PDF (Ctrl+E)">Export PDF</button>
+          <div class="export-dropdown-wrap" style="position: relative; display: inline-flex;">
+            <button id="btn-export" class="btn btn-primary" title="Export PDF (Ctrl+E)">Export</button>
+            <button id="btn-export-options" class="btn btn-primary" style="padding: 3px 6px; border-left: 1px solid rgba(255,255,255,0.3);" title="Export Options">▾</button>
+            <div id="export-menu" class="dropdown-menu hidden" style="position: absolute; right: 0; top: 100%; margin-top: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow); z-index: 100; min-width: 160px; display: flex; flex-direction: column;">
+              <button id="btn-export-pdf" class="btn" style="border: none; text-align: left; padding: 6px 12px; border-radius: 0;">Export PDF (.pdf)</button>
+              <button id="btn-export-png" class="btn" style="border: none; text-align: left; padding: 6px 12px; border-radius: 0;">Export PNG (.png)</button>
+              <button id="btn-export-svg" class="btn" style="border: none; text-align: left; padding: 6px 12px; border-radius: 0;">Export SVG (.svg)</button>
+            </div>
+          </div>
           <button id="btn-settings" class="btn btn-icon" title="Settings">⚙</button>
         </div>
       </header>
@@ -69,7 +77,7 @@
         <span id="status-state" class="status-item">Ready</span>
         <span class="spacer"></span>
         <span id="status-pos" class="status-item">Ln 1, Col 1</span>
-        <span class="status-item">Typst 0.15.1</span>
+        <span id="status-typst-ver" class="status-item">Typst 0.15.1</span>
       </footer>
     </div>
 
@@ -93,6 +101,11 @@
           <div class="form-group" style="flex-direction: row; align-items: center; gap: 8px;">
             <input id="setting-autosave" type="checkbox" id="setting-autosave" checked />
             <label for="setting-autosave" style="margin: 0; cursor: pointer;">Enable Autosave (1s idle)</label>
+          </div>
+          <div class="form-group">
+            <label for="setting-typst-path">Custom Typst Path (optional)</label>
+            <input id="setting-typst-path" type="text" class="form-input" placeholder="e.g. C:\Program Files\Typst\typst.exe" />
+            <small style="color: var(--muted); margin-top: 4px;">Leave empty to use system <code>typst</code> on PATH</small>
           </div>
         </div>
         <div class="modal-footer">
