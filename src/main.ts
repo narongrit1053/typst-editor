@@ -701,10 +701,19 @@ async function handleExternalFileChange() {
   } catch {}
 }
 
-window.addEventListener("DOMContentLoaded", async () => {
-  await loadSettings();
-  initSettingsModal();
+function initApp() {
+  console.log("Typst-Editor: wiring UI and event listeners...");
+
   initSplitter();
+  initSettingsModal();
+
+  // Template market initialization
+  initTemplateMarket(async (targetDir) => {
+    await openFolder(targetDir);
+  });
+
+  // Preview frame
+  const previewFrame = document.getElementById("preview") as HTMLIFrameElement;
 
   initPreviewSync((file, line, col) => {
     if (file && file !== currentFilePath) {
@@ -715,8 +724,6 @@ window.addEventListener("DOMContentLoaded", async () => {
       editor?.jumpTo(line, col);
     }
   });
-
-  const previewFrame = document.getElementById("preview") as HTMLIFrameElement;
 
   // Zoom controls
   const btnZoomIn = document.getElementById("btn-zoom-in");
@@ -764,11 +771,6 @@ window.addEventListener("DOMContentLoaded", async () => {
   const btnOpenFolder = document.getElementById("btn-open-folder");
   btnOpenFolder?.addEventListener("click", () => {
     openFolder().catch(console.error);
-  });
-
-  // Template market
-  initTemplateMarket(async (targetDir) => {
-    await openFolder(targetDir);
   });
 
   const btnTemplates = document.getElementById("btn-templates");
@@ -846,27 +848,6 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
-  // First-run Typst check
-  try {
-    const settings = getCachedSettings();
-    invoke<string>("check_typst", { customBinary: settings.customTypstPath || null })
-      .then((ver) => {
-        const verEl = document.getElementById("status-typst-ver");
-        if (verEl) {
-          verEl.textContent = ver.split(" ")[1] ? `Typst ${ver.split(" ")[1]}` : ver;
-        }
-      })
-      .catch(() => {
-        showBannerWithAction(
-          "Typst CLI was not found. Export requires Typst. Install via winget or configure in Settings.",
-          "Settings",
-          () => {
-            document.getElementById("modal-settings")?.classList.remove("hidden");
-          },
-        );
-      });
-  } catch {}
-
   // Global key shortcuts
   window.addEventListener("keydown", (e) => {
     if (e.ctrlKey && e.key.toLowerCase() === "b") {
@@ -905,6 +886,62 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
+  // Window focus check
+  window.addEventListener("focus", () => {
+    handleExternalFileChange().catch(console.error);
+  });
+
+  try {
+    const appWindow = getCurrentWindow();
+    appWindow.onCloseRequested(async (event) => {
+      if (saver && saver.isDirty()) {
+        try {
+          await saver.saveNow();
+        } catch {
+          const shouldClose = await ask(
+            "Could not save changes. Close without saving?",
+            { title: "Typst-Editor by Kong", kind: "warning" },
+          );
+          if (!shouldClose) {
+            event.preventDefault();
+            return;
+          }
+        }
+      }
+      stopPreview().catch(() => {});
+    }).catch(console.warn);
+  } catch (e) {
+    console.warn("Could not register window close listener:", e);
+  }
+
+  window.addEventListener("beforeunload", () => {
+    stopPreview().catch(() => {});
+  });
+
+  // Background async tasks (never block UI responsiveness)
+  loadSettings().catch(console.warn);
+
+  // First-run Typst check
+  try {
+    const settings = getCachedSettings();
+    invoke<string>("check_typst", { customBinary: settings.customTypstPath || null })
+      .then((ver) => {
+        const verEl = document.getElementById("status-typst-ver");
+        if (verEl) {
+          verEl.textContent = ver.split(" ")[1] ? `Typst ${ver.split(" ")[1]}` : ver;
+        }
+      })
+      .catch(() => {
+        showBannerWithAction(
+          "Typst CLI was not found. Export requires Typst. Install via winget or configure in Settings.",
+          "Settings",
+          () => {
+            document.getElementById("modal-settings")?.classList.remove("hidden");
+          },
+        );
+      });
+  } catch {}
+
   // Check for updates quietly in background
   checkForUpdates(true).then(async (info) => {
     if (info && info.available && info.download_url) {
@@ -933,36 +970,11 @@ window.addEventListener("DOMContentLoaded", async () => {
       );
     }
   }).catch(() => {});
+}
 
-  // Window focus check
-  window.addEventListener("focus", () => {
-    handleExternalFileChange().catch(console.error);
-  });
-
-  try {
-    const appWindow = getCurrentWindow();
-    await appWindow.onCloseRequested(async (event) => {
-      if (saver && saver.isDirty()) {
-        try {
-          await saver.saveNow();
-        } catch {
-          const shouldClose = await ask(
-            "Could not save changes. Close without saving?",
-            { title: "Typst-Editor by Kong", kind: "warning" },
-          );
-          if (!shouldClose) {
-            event.preventDefault();
-            return;
-          }
-        }
-      }
-      stopPreview().catch(() => {});
-    });
-  } catch (e) {
-    console.warn("Could not register window close listener:", e);
-  }
-
-  window.addEventListener("beforeunload", () => {
-    stopPreview().catch(() => {});
-  });
-});
+// Ensure initApp runs regardless of whether document is already parsed or loading
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initApp);
+} else {
+  initApp();
+}

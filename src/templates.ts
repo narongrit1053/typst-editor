@@ -181,10 +181,6 @@ export function initTemplateMarket(onOpenProject: (path: string) => void): void 
       window.alert(`Failed to save template: ${err?.message || err}`);
     }
   });
-
-  loadTemplates().then(() => {
-    renderGrid(onOpenProject, "");
-  });
 }
 
 function renderMarket(onOpenProject: (path: string) => void) {
