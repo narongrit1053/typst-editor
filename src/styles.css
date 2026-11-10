@@ -1,0 +1,291 @@
+:root {
+  --bg: #f7f6f3;
+  --panel: #ffffff;
+  --ink: #1d2433;
+  --muted: #5d6677;
+  --line: #dcdfe6;
+  --accent: #1f7a8c;
+  --accent-soft: #e2f1f4;
+  --warn: #b4540a;
+  --warn-soft: #fdf0e1;
+  --err: #d6453d;
+  --err-soft: #fde8e7;
+  --ok: #2c7a4b;
+  --code-bg: #f1f3f6;
+  --shadow: 0 1px 3px rgba(20, 30, 50, 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14171d;
+    --panel: #1c2028;
+    --ink: #e6e9ef;
+    --muted: #9aa3b2;
+    --line: #2e3440;
+    --accent: #5cc0d3;
+    --accent-soft: #17323a;
+    --warn: #f0a35c;
+    --warn-soft: #3a2a17;
+    --err: #e06c75;
+    --err-soft: #381f21;
+    --ok: #6cc48c;
+    --code-bg: #232833;
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+  font: 13.5px/1.5 "Segoe UI", system-ui, -apple-system, sans-serif;
+  user-select: none;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+/* Banner */
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--warn-soft);
+  color: var(--warn);
+  border-bottom: 1px solid var(--warn);
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.banner.hidden {
+  display: none !important;
+}
+
+/* Toolbar */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  height: 42px;
+  min-height: 42px;
+  gap: 12px;
+}
+
+.toolbar-left, .toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.file-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 400px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn:hover {
+  background: var(--code-bg);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: var(--accent);
+}
+
+.btn-primary:hover {
+  filter: brightness(1.1);
+}
+
+.btn-sm {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+/* Workspace layout */
+.workspace {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.editor-pane {
+  flex: 0 0 50%;
+  min-width: 20%;
+  max-width: 80%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+}
+
+.splitter {
+  width: 6px;
+  background: var(--line);
+  cursor: col-resize;
+  flex-shrink: 0;
+  transition: background 0.15s;
+  position: relative;
+  z-index: 10;
+}
+
+.splitter:hover, .splitter:focus-visible, .splitter.dragging {
+  background: var(--accent);
+  outline: none;
+}
+
+.preview-pane {
+  flex: 1;
+  min-width: 20%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--code-bg);
+  position: relative;
+}
+
+.preview-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+  background: var(--code-bg);
+}
+
+/* Problems panel */
+.problems {
+  display: flex;
+  flex-direction: column;
+  max-height: 160px;
+  min-height: 48px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+  overflow-y: auto;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 12px;
+}
+
+.problems.hidden {
+  display: none !important;
+}
+
+.problems-header {
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  background: var(--code-bg);
+  border-bottom: 1px solid var(--line);
+}
+
+.problems-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.problem-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  border-bottom: 1px solid var(--line);
+}
+
+.problem-item:hover {
+  background: var(--accent-soft);
+}
+
+.problem-item:focus-visible {
+  outline: 2px solid var(--accent);
+}
+
+.problem-item.error {
+  color: var(--err);
+}
+
+.problem-item.warning {
+  color: var(--warn);
+}
+
+/* Status bar */
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 2px 12px;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 11.5px;
+  height: 24px;
+  min-height: 24px;
+}
+
+.status-item {
+  white-space: nowrap;
+}
+
+.spacer {
+  flex: 1;
+}
+
+/* CodeMirror container */
+.cm-editor {
+  height: 100%;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 13.5px;
+}

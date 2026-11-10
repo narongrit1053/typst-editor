@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Typst-Editor by Kong</title>
+  </head>
+
+  <body>
+    <div id="app">
+      <div id="banner" class="banner hidden">
+        <span id="banner-text"></span>
+        <button id="banner-action" class="btn btn-sm hidden">Action</button>
+      </div>
+
+      <header id="toolbar" class="toolbar">
+        <div class="toolbar-left">
+          <button id="btn-open" class="btn" title="Open file (Ctrl+O)">Open...</button>
+          <span id="file-name" class="file-name" title="No file open">No file open</span>
+        </div>
+        <div class="toolbar-right">
+          <button id="btn-export" class="btn btn-primary" title="Export PDF (Ctrl+E)">Export PDF</button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <div id="editor" class="editor-pane"></div>
+        <div id="splitter" class="splitter" role="separator" aria-orientation="vertical" tabindex="0"></div>
+        <div class="preview-pane">
+          <iframe id="preview" class="preview-frame" title="Preview"></iframe>
+        </div>
+      </main>
+
+      <div id="problems" class="problems hidden">
+        <div class="problems-header">Problems</div>
+        <div id="problems-list" class="problems-list"></div>
+      </div>
+
+      <footer class="statusbar">
+        <span id="status-state" class="status-item">Ready</span>
+        <span class="spacer"></span>
+        <span id="status-pos" class="status-item">Ln 1, Col 1</span>
+        <span class="status-item">Typst 0.15.1</span>
+      </footer>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
