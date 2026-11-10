@@ -85,11 +85,32 @@ export async function saveSettings(settings: AppSettings): Promise<void> {
   await invoke("save_app_settings", { settingsJson: JSON.stringify(settings, null, 2) });
 }
 
+export interface UpdateInfo {
+  current_version: string;
+  latest_version: string;
+  available: boolean;
+  notes: string;
+  download_url?: string;
+}
+
+export async function checkForUpdates(quiet = false): Promise<UpdateInfo | null> {
+  try {
+    return await invoke<UpdateInfo>("check_app_update");
+  } catch (err) {
+    if (!quiet) {
+      console.warn("Update check error:", err);
+    }
+    return null;
+  }
+}
+
 export function initSettingsModal(): void {
   const modal = document.getElementById("modal-settings");
   const btnSettings = document.getElementById("btn-settings");
   const btnCancel = document.getElementById("btn-settings-cancel");
   const btnSave = document.getElementById("btn-settings-save");
+  const btnCheckUpdates = document.getElementById("btn-check-updates");
+  const updateStatusText = document.getElementById("update-status-text");
 
   const selectTheme = document.getElementById("setting-theme") as HTMLSelectElement | null;
   const inputFontSize = document.getElementById("setting-fontsize") as HTMLInputElement | null;
@@ -108,6 +129,30 @@ export function initSettingsModal(): void {
 
   btnCancel.addEventListener("click", () => {
     modal.classList.add("hidden");
+  });
+
+  btnCheckUpdates?.addEventListener("click", async () => {
+    if (updateStatusText) {
+      updateStatusText.textContent = "Checking for updates...";
+      updateStatusText.style.color = "var(--muted)";
+    }
+    const info = await checkForUpdates(true);
+    if (info && info.available) {
+      if (updateStatusText) {
+        updateStatusText.textContent = `Update available: v${info.latest_version}`;
+        updateStatusText.style.color = "var(--accent)";
+      }
+    } else if (info) {
+      if (updateStatusText) {
+        updateStatusText.textContent = `You're on the latest version (v${info.current_version})`;
+        updateStatusText.style.color = "var(--ok)";
+      }
+    } else {
+      if (updateStatusText) {
+        updateStatusText.textContent = "Could not check updates (offline or unreachable)";
+        updateStatusText.style.color = "var(--muted)";
+      }
+    }
   });
 
   btnSave.addEventListener("click", async () => {

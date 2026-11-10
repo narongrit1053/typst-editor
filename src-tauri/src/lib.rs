@@ -38,6 +38,13 @@ pub fn run() {
             commands::export_pdf,
             commands::export_file,
             commands::check_typst,
+            commands::check_app_update,
+            commands::download_and_launch_installer,
+            commands::fetch_template_catalog,
+            commands::create_from_template,
+            commands::save_as_my_template,
+            commands::list_my_templates,
+            commands::use_my_template,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

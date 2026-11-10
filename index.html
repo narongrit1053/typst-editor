@@ -107,6 +107,15 @@
             <input id="setting-typst-path" type="text" class="form-input" placeholder="e.g. C:\Program Files\Typst\typst.exe" />
             <small style="color: var(--muted); margin-top: 4px;">Leave empty to use system <code>typst</code> on PATH</small>
           </div>
+          <div class="form-group" style="border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div>
+                <strong style="font-size: 13px;">Software Update</strong>
+                <div id="update-status-text" style="color: var(--muted); font-size: 12px;">Typst-Editor by Kong v0.1.0</div>
+              </div>
+              <button id="btn-check-updates" class="btn btn-sm">Check for Updates</button>
+            </div>
+          </div>
         </div>
         <div class="modal-footer">
           <button id="btn-settings-cancel" class="btn">Cancel</button>

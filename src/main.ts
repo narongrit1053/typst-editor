@@ -22,6 +22,7 @@ import {
   saveSettings,
   initSettingsModal,
   getCachedSettings,
+  checkForUpdates,
 } from "./settings";
 
 let lspConnection: LspConnection | null = null;
@@ -859,6 +860,35 @@ window.addEventListener("DOMContentLoaded", async () => {
       if (previewFrame) updateZoomLabel(resetZoom(previewFrame));
     }
   });
+
+  // Check for updates quietly in background
+  checkForUpdates(true).then(async (info) => {
+    if (info && info.available && info.download_url) {
+      showBannerWithAction(
+        `Version ${info.latest_version} is available.`,
+        "Install and restart",
+        async () => {
+          if (saver && saver.isDirty()) {
+            const confirmed = await ask(
+              "You have unsaved changes. Save before updating and restarting?",
+              { title: "Typst-Editor by Kong", kind: "warning" },
+            );
+            if (confirmed) {
+              await saver.saveNow();
+            } else {
+              return;
+            }
+          }
+          try {
+            showBanner(`Downloading update v${info.latest_version}...`, false);
+            await invoke("download_and_launch_installer", { url: info.download_url });
+          } catch (e: any) {
+            showBanner(`Update failed: ${e?.message || e}`);
+          }
+        },
+      );
+    }
+  }).catch(() => {});
 
   // Window focus check
   window.addEventListener("focus", () => {

@@ -225,6 +225,233 @@ pub fn check_typst(custom_binary: Option<String>) -> Result<String, String> {
     }
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct UpdateInfo {
+    pub current_version: String,
+    pub latest_version: String,
+    pub available: bool,
+    pub notes: String,
+    pub download_url: Option<String>,
+}
+
+pub fn is_version_newer(current: &str, latest: &str) -> bool {
+    let parse_ver = |s: &str| -> Vec<u32> {
+        s.trim_start_matches('v')
+            .split('.')
+            .filter_map(|part| part.split('-').next().unwrap_or(part).parse::<u32>().ok())
+            .collect()
+    };
+    let c = parse_ver(current);
+    let l = parse_ver(latest);
+    l > c
+}
+
+#[tauri::command]
+pub fn check_app_update(custom_endpoint: Option<String>) -> Result<UpdateInfo, String> {
+    let current_version = env!("CARGO_PKG_VERSION").to_string();
+    let url = custom_endpoint
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| "https://github.com/kong/typst-editor/releases/latest/download/latest.json".to_string());
+
+    let resp = ureq::get(&url)
+        .timeout(std::time::Duration::from_secs(5))
+        .call()
+        .map_err(|e| format!("UPDATE_CHECK_FAILED: {}", e))?;
+
+    let body: serde_json::Value = resp.into_json().map_err(|e| e.to_string())?;
+    let latest_version = body["version"].as_str().unwrap_or(&current_version).to_string();
+    let notes = body["notes"].as_str().unwrap_or("").to_string();
+    let available = is_version_newer(&current_version, &latest_version);
+    let download_url = body["platforms"]["windows-x86_64"]["url"].as_str().map(|s| s.to_string());
+
+    Ok(UpdateInfo {
+        current_version,
+        latest_version,
+        available,
+        notes,
+        download_url,
+    })
+}
+
+#[tauri::command]
+pub fn download_and_launch_installer(url: String) -> Result<(), String> {
+    let temp_dir = std::env::temp_dir();
+    let installer_path = temp_dir.join("typst-editor-setup.exe");
+
+    let resp = ureq::get(&url)
+        .timeout(std::time::Duration::from_secs(60))
+        .call()
+        .map_err(|e| format!("DOWNLOAD_FAILED: {}", e))?;
+
+    let mut reader = resp.into_reader();
+    let mut file = fs::File::create(&installer_path).map_err(|e| e.to_string())?;
+    std::io::copy(&mut reader, &mut file).map_err(|e| e.to_string())?;
+    drop(file);
+
+    let mut cmd = Command::new(&installer_path);
+    cmd.spawn().map_err(|e| format!("LAUNCH_FAILED: {}", e))?;
+    Ok(())
+}
+
+// --- Phase 5: Template Market Commands ---
+
+pub fn template_cache_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
+    Ok(data_dir.join("template_cache.json"))
+}
+
+pub fn my_templates_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let dir = data_dir.join("my_templates");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
+}
+
+#[tauri::command]
+pub fn fetch_template_catalog(app: AppHandle) -> Result<String, String> {
+    let cache_file = template_cache_path(&app)?;
+    let url = "https://packages.typst.org/preview/index.json";
+
+    match ureq::get(url).timeout(std::time::Duration::from_secs(6)).call() {
+        Ok(resp) => {
+            if let Ok(text) = resp.into_string() {
+                let _ = fs::write(&cache_file, &text);
+                return Ok(text);
+            }
+        }
+        Err(_) => {
+            // Offline fallback: load from cache
+            if cache_file.exists() {
+                if let Ok(cached) = fs::read_to_string(&cache_file) {
+                    return Ok(cached);
+                }
+            }
+        }
+    }
+
+    if cache_file.exists() {
+        fs::read_to_string(&cache_file).map_err(|e| e.to_string())
+    } else {
+        Err("CATALOG_UNAVAILABLE".to_string())
+    }
+}
+
+#[tauri::command]
+pub fn create_from_template(target_dir: String, package_spec: String) -> Result<(), String> {
+    let target = PathBuf::from(&target_dir);
+    if !target.exists() {
+        fs::create_dir_all(&target).map_err(|e| e.to_string())?;
+    }
+
+    let mut cmd = Command::new("typst");
+    cmd.arg("init").arg(&package_spec).arg(&target_dir);
+
+    #[cfg(windows)]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+
+    let output = cmd.output().map_err(|e| {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            "TYPST_NOT_FOUND".to_string()
+        } else {
+            e.to_string()
+        }
+    })?;
+
+    if !output.status.success() {
+        let err_msg = String::from_utf8_lossy(&output.stderr).to_string();
+        return Err(if err_msg.trim().is_empty() {
+            format!("typst init failed with code {}", output.status)
+        } else {
+            err_msg
+        });
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn save_as_my_template(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    name: String,
+) -> Result<(), String> {
+    let root_guard = state.root.lock().map_err(|e| e.to_string())?;
+    let root = root_guard.as_ref().ok_or_else(|| "NO_ROOT".to_string())?;
+
+    let clean_name = name.trim().replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
+    if clean_name.is_empty() {
+        return Err("INVALID_NAME".to_string());
+    }
+
+    let templates_dir = my_templates_dir(&app)?;
+    let dest_dir = templates_dir.join(&clean_name);
+    if dest_dir.exists() {
+        fs::remove_dir_all(&dest_dir).map_err(|e| e.to_string())?;
+    }
+    fs::create_dir_all(&dest_dir).map_err(|e| e.to_string())?;
+
+    // Copy all files from project root to dest_dir recursively
+    copy_dir_recursive(root, &dest_dir)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn list_my_templates(app: AppHandle) -> Result<Vec<String>, String> {
+    let templates_dir = my_templates_dir(&app)?;
+    let mut names = Vec::new();
+    if let Ok(entries) = fs::read_dir(templates_dir) {
+        for entry in entries.flatten() {
+            if entry.path().is_dir() {
+                if let Ok(name) = entry.file_name().into_string() {
+                    names.push(name);
+                }
+            }
+        }
+    }
+    names.sort();
+    Ok(names)
+}
+
+#[tauri::command]
+pub fn use_my_template(
+    app: AppHandle,
+    template_name: String,
+    target_dir: String,
+) -> Result<(), String> {
+    let templates_dir = my_templates_dir(&app)?;
+    let src = templates_dir.join(&template_name);
+    if !src.exists() {
+        return Err("TEMPLATE_NOT_FOUND".to_string());
+    }
+
+    let dest = PathBuf::from(&target_dir);
+    fs::create_dir_all(&dest).map_err(|e| e.to_string())?;
+    copy_dir_recursive(&src, &dest)?;
+    Ok(())
+}
+
+pub fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
+    for entry in fs::read_dir(src).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let file_type = entry.file_type().map_err(|e| e.to_string())?;
+        let file_name = entry.file_name();
+        let name_str = file_name.to_string_lossy();
+        if name_str == ".git" || name_str == "node_modules" || name_str == "target" {
+            continue;
+        }
+
+        let dest_child = dst.join(&file_name);
+        if file_type.is_dir() {
+            fs::create_dir_all(&dest_child).map_err(|e| e.to_string())?;
+            copy_dir_recursive(&entry.path(), &dest_child)?;
+        } else {
+            fs::copy(entry.path(), &dest_child).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn export_file(
     state: State<'_, AppState>,
@@ -396,5 +623,28 @@ mod tests {
         if let Ok(ver) = check_typst(None) {
             assert!(ver.contains("typst"));
         }
+    }
+
+    #[test]
+    fn test_is_version_newer() {
+        assert!(is_version_newer("0.1.0", "0.2.0"));
+        assert!(is_version_newer("0.1.0", "1.0.0"));
+        assert!(is_version_newer("v0.1.0", "v0.1.1"));
+        assert!(!is_version_newer("0.2.0", "0.1.0"));
+        assert!(!is_version_newer("0.1.0", "0.1.0"));
+    }
+
+    #[test]
+    fn test_copy_dir_recursive() {
+        let dir = tempdir().unwrap();
+        let src = dir.path().join("src");
+        let dst = dir.path().join("dst");
+        fs::create_dir_all(src.join("sub")).unwrap();
+        fs::write(src.join("sub/chapter.typ"), "hello").unwrap();
+        fs::create_dir_all(&dst).unwrap();
+
+        copy_dir_recursive(&src, &dst).unwrap();
+        assert!(dst.join("sub/chapter.typ").exists());
+        assert_eq!(fs::read_to_string(dst.join("sub/chapter.typ")).unwrap(), "hello");
     }
 }
