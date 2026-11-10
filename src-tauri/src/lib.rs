@@ -28,6 +28,13 @@ pub fn run() {
             commands::set_root,
             commands::read_file,
             commands::write_file,
+            commands::list_dir,
+            commands::create_file,
+            commands::create_dir,
+            commands::rename_path,
+            commands::delete_path,
+            commands::load_app_settings,
+            commands::save_app_settings,
             commands::export_pdf,
         ])
         .build(tauri::generate_context!())

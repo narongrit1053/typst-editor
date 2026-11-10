@@ -2,13 +2,20 @@ use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use tauri::State;
+use tauri::{AppHandle, Manager, State};
 use crate::AppState;
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct FileEntry {
+    pub name: String,
+    pub path: String,
+    pub is_dir: bool,
+}
 
 pub fn resolve_inside(root: &Path, candidate: &Path) -> Result<PathBuf, String> {
     let root_canon = fs::canonicalize(root).map_err(|e| format!("NO_ROOT: {}", e))?;
@@ -64,6 +71,35 @@ pub fn export_args(
     args
 }
 
+pub fn list_directory(target_dir: &Path) -> Result<Vec<FileEntry>, String> {
+    let mut entries = Vec::new();
+    let read_dir = fs::read_dir(target_dir).map_err(|e| e.to_string())?;
+    for item in read_dir {
+        let entry = item.map_err(|e| e.to_string())?;
+        let path = entry.path();
+        let file_name = entry.file_name().to_string_lossy().to_string();
+        if file_name == ".git" || file_name == "node_modules" || file_name == "target" || file_name == ".superpowers" {
+            continue;
+        }
+        let is_dir = path.is_dir();
+        entries.push(FileEntry {
+            name: file_name,
+            path: path.to_string_lossy().to_string(),
+            is_dir,
+        });
+    }
+
+    entries.sort_by(|a, b| {
+        if a.is_dir != b.is_dir {
+            b.is_dir.cmp(&a.is_dir)
+        } else {
+            a.name.to_lowercase().cmp(&b.name.to_lowercase())
+        }
+    });
+
+    Ok(entries)
+}
+
 #[tauri::command]
 pub fn set_root(state: State<'_, AppState>, path: String) -> Result<(), String> {
     let p = PathBuf::from(path);
@@ -86,6 +122,82 @@ pub fn write_file(state: State<'_, AppState>, path: String, contents: String) ->
     let root = root_guard.as_ref().ok_or_else(|| "NO_ROOT".to_string())?;
     let target = resolve_inside(root, Path::new(&path))?;
     write_file_atomic(&target, &contents)
+}
+
+#[tauri::command]
+pub fn list_dir(state: State<'_, AppState>, path: Option<String>) -> Result<Vec<FileEntry>, String> {
+    let root_guard = state.root.lock().map_err(|e| e.to_string())?;
+    let root = root_guard.as_ref().ok_or_else(|| "NO_ROOT".to_string())?;
+    let target = match path {
+        Some(p) => resolve_inside(root, Path::new(&p))?,
+        None => root.clone(),
+    };
+    list_directory(&target)
+}
+
+#[tauri::command]
+pub fn create_file(state: State<'_, AppState>, path: String) -> Result<(), String> {
+    let root_guard = state.root.lock().map_err(|e| e.to_string())?;
+    let root = root_guard.as_ref().ok_or_else(|| "NO_ROOT".to_string())?;
+    let target = resolve_inside(root, Path::new(&path))?;
+    if target.exists() {
+        return Err("FILE_ALREADY_EXISTS".to_string());
+    }
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    fs::write(&target, "").map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn create_dir(state: State<'_, AppState>, path: String) -> Result<(), String> {
+    let root_guard = state.root.lock().map_err(|e| e.to_string())?;
+    let root = root_guard.as_ref().ok_or_else(|| "NO_ROOT".to_string())?;
+    let target = resolve_inside(root, Path::new(&path))?;
+    fs::create_dir_all(&target).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn rename_path(state: State<'_, AppState>, old_path: String, new_path: String) -> Result<(), String> {
+    let root_guard = state.root.lock().map_err(|e| e.to_string())?;
+    let root = root_guard.as_ref().ok_or_else(|| "NO_ROOT".to_string())?;
+    let old_target = resolve_inside(root, Path::new(&old_path))?;
+    let new_target = resolve_inside(root, Path::new(&new_path))?;
+    fs::rename(old_target, new_target).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_path(state: State<'_, AppState>, path: String) -> Result<(), String> {
+    let root_guard = state.root.lock().map_err(|e| e.to_string())?;
+    let root = root_guard.as_ref().ok_or_else(|| "NO_ROOT".to_string())?;
+    let target = resolve_inside(root, Path::new(&path))?;
+    if target.is_dir() {
+        fs::remove_dir_all(target).map_err(|e| e.to_string())
+    } else {
+        fs::remove_file(target).map_err(|e| e.to_string())
+    }
+}
+
+pub fn settings_file_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
+    Ok(config_dir.join("settings.json"))
+}
+
+#[tauri::command]
+pub fn load_app_settings(app: AppHandle) -> Result<String, String> {
+    let path = settings_file_path(&app)?;
+    if path.exists() {
+        fs::read_to_string(&path).map_err(|e| e.to_string())
+    } else {
+        Ok("{}".to_string())
+    }
+}
+
+#[tauri::command]
+pub fn save_app_settings(app: AppHandle, settings_json: String) -> Result<(), String> {
+    let path = settings_file_path(&app)?;
+    write_file_atomic(&path, &settings_json)
 }
 
 #[tauri::command]
@@ -148,9 +260,9 @@ mod tests {
         fs::write(proj2.join("b.typ"), "b").unwrap();
 
         assert!(resolve_inside(&proj, &proj.join("sub/a.typ")).is_ok());
-        assert!(resolve_inside(&proj, &proj.join("new.typ")).is_ok()); // not yet existing
+        assert!(resolve_inside(&proj, &proj.join("new.typ")).is_ok());
         assert_eq!(resolve_inside(&proj, &proj.join("../proj2/b.typ")), Err("OUTSIDE_ROOT".into()));
-        assert_eq!(resolve_inside(&proj, &proj2.join("b.typ")), Err("OUTSIDE_ROOT".into())); // sibling with same prefix
+        assert_eq!(resolve_inside(&proj, &proj2.join("b.typ")), Err("OUTSIDE_ROOT".into()));
     }
 
     #[test]
@@ -177,7 +289,6 @@ mod tests {
         assert!(res.is_err());
         assert_eq!(fs::read_to_string(&file_path).unwrap(), "initial content");
 
-        // Clean up permissions so tempdir can be deleted
         perms.set_readonly(false);
         let _ = fs::set_permissions(&file_path, perms);
     }
@@ -201,5 +312,42 @@ mod tests {
             Some(Path::new("fonts")),
         );
         assert_eq!(&b[5..], ["--font-path", "fonts"].map(OsString::from));
+    }
+
+    #[test]
+    fn test_list_directory_ordering() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("subdir")).unwrap();
+        fs::write(dir.path().join("b.typ"), "").unwrap();
+        fs::write(dir.path().join("a.typ"), "").unwrap();
+
+        let entries = list_directory(dir.path()).unwrap();
+        assert_eq!(entries.len(), 3);
+        assert_eq!(entries[0].name, "subdir");
+        assert!(entries[0].is_dir);
+        assert_eq!(entries[1].name, "a.typ");
+        assert!(!entries[1].is_dir);
+        assert_eq!(entries[2].name, "b.typ");
+        assert!(!entries[2].is_dir);
+    }
+
+    #[test]
+    fn test_create_and_delete_operations() {
+        let dir = tempdir().unwrap();
+        let root = dir.path().join("root");
+        fs::create_dir_all(&root).unwrap();
+
+        // create file inside root
+        let target = resolve_inside(&root, &root.join("new_file.typ")).unwrap();
+        fs::write(&target, "content").unwrap();
+        assert!(target.exists());
+
+        // delete file
+        fs::remove_file(&target).unwrap();
+        assert!(!target.exists());
+
+        // path traversal attempt is blocked by resolve_inside
+        let outside = resolve_inside(&root, &root.join("../escaped.typ"));
+        assert_eq!(outside, Err("OUTSIDE_ROOT".into()));
     }
 }
