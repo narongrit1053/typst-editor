@@ -14,6 +14,9 @@ let saver: Saver | null = null;
 let currentFilePath: string | null = null;
 let currentEol: "\r\n" | "\n" = "\n";
 
+let lastRestartTime = 0;
+let isReconnecting = false;
+
 export function getCurrentFilePath(): string | null {
   return currentFilePath;
 }
@@ -33,7 +36,12 @@ export function getSaver(): Saver | null {
 export function showBanner(message: string, isError = true) {
   const banner = document.getElementById("banner");
   const bannerText = document.getElementById("banner-text");
+  const bannerAction = document.getElementById("banner-action");
   if (!banner || !bannerText) return;
+
+  if (bannerAction) {
+    bannerAction.classList.add("hidden");
+  }
 
   bannerText.textContent = message;
   banner.classList.remove("hidden");
@@ -48,10 +56,34 @@ export function showBanner(message: string, isError = true) {
   }
 }
 
+export function showBannerWithAction(message: string, actionLabel: string, onAction: () => void) {
+  const banner = document.getElementById("banner");
+  const bannerText = document.getElementById("banner-text");
+  const bannerAction = document.getElementById("banner-action") as HTMLButtonElement | null;
+  if (!banner || !bannerText) return;
+
+  bannerText.textContent = message;
+  banner.classList.remove("hidden");
+  banner.style.background = "var(--warn-soft)";
+  banner.style.color = "var(--warn)";
+  banner.style.borderColor = "var(--warn)";
+
+  if (bannerAction) {
+    bannerAction.textContent = actionLabel;
+    bannerAction.classList.remove("hidden");
+    bannerAction.onclick = () => {
+      onAction();
+    };
+  }
+}
+
 export function hideBanner() {
   const banner = document.getElementById("banner");
-  if (banner) {
-    banner.classList.add("hidden");
+  const bannerAction = document.getElementById("banner-action");
+  if (!banner) return;
+  banner.classList.add("hidden");
+  if (bannerAction) {
+    bannerAction.classList.add("hidden");
   }
 }
 
@@ -106,6 +138,91 @@ function initSplitter() {
 
   splitter.addEventListener("pointerup", stopDrag);
   splitter.addEventListener("pointercancel", stopDrag);
+}
+
+async function reconnectLsp() {
+  if (!currentFilePath) return;
+  isReconnecting = true;
+  try {
+    const folder = currentFilePath.replace(/[\\/][^\\/]+$/, "") || ".";
+    if (lspConnection) {
+      try {
+        lspConnection.close();
+      } catch {}
+    }
+
+    lspConnection = await connectLsp(folder, () => {
+      handleLspExit();
+    });
+
+    const editorEl = document.getElementById("editor")!;
+    const currentText = editor ? editor.getText() : await invoke<string>("read_file", { path: currentFilePath });
+
+    if (editor) {
+      editor.destroy();
+    }
+
+    editor = createEditor(editorEl, lspConnection);
+    const statusPos = document.getElementById("status-pos");
+    editor.onCursor((line, col) => {
+      if (statusPos) {
+        statusPos.textContent = `Ln ${line}, Col ${col}`;
+      }
+    });
+
+    editor.onDiagnostics((problems) => {
+      const problemsEl = document.getElementById("problems");
+      const statusState = document.getElementById("status-state");
+      if (problemsEl) {
+        renderProblems(problemsEl, problems, folder, (p) => {
+          editor?.jumpTo(p.line, p.col);
+        });
+      }
+      if (statusState) {
+        statusState.textContent = summarise(problems);
+      }
+    });
+
+    editor.onChange(() => {
+      saver?.touch();
+    });
+
+    editor.open(currentFilePath, currentText);
+
+    const previewFrame = document.getElementById("preview") as HTMLIFrameElement;
+    if (previewFrame && lspConnection) {
+      await startPreview(previewFrame, lspConnection, currentFilePath);
+    }
+  } finally {
+    isReconnecting = false;
+  }
+}
+
+async function handleLspExit() {
+  if (isReconnecting || !currentFilePath) return;
+  const now = Date.now();
+  const timeSinceLastRestart = now - lastRestartTime;
+
+  if (timeSinceLastRestart < 30000 && lastRestartTime !== 0) {
+    showBannerWithAction("Language service stopped.", "Restart", () => {
+      hideBanner();
+      reconnectLsp().catch((err) => {
+        showBanner(`Restart failed: ${err}`);
+      });
+    });
+    return;
+  }
+
+  lastRestartTime = now;
+  try {
+    await reconnectLsp();
+    hideBanner();
+  } catch (err) {
+    showBannerWithAction("Language service failed to restart.", "Restart", () => {
+      hideBanner();
+      reconnectLsp().catch((e) => showBanner(`Restart failed: ${e}`));
+    });
+  }
 }
 
 export async function exportPdf() {
@@ -171,8 +288,9 @@ export async function openFile(filePath?: string) {
     lspConnection.close();
   }
 
+  lastRestartTime = 0;
   lspConnection = await connectLsp(folder, () => {
-    console.warn("LSP exited");
+    handleLspExit();
   });
 
   const editorEl = document.getElementById("editor")!;
