@@ -16,15 +16,43 @@
 
       <header id="toolbar" class="toolbar">
         <div class="toolbar-left">
-          <button id="btn-open" class="btn" title="Open file (Ctrl+O)">Open...</button>
+          <button id="btn-sidebar" class="btn btn-icon" title="Toggle Sidebar (Ctrl+B)">☰</button>
+          <button id="btn-open-folder" class="btn" title="Open Folder">Open Folder...</button>
+          <button id="btn-open" class="btn" title="Open File (Ctrl+O)">Open File...</button>
           <span id="file-name" class="file-name" title="No file open">No file open</span>
         </div>
         <div class="toolbar-right">
+          <button id="btn-format" class="btn" title="Format Document (Shift+Alt+F)">Format</button>
+          <div class="zoom-controls">
+            <button id="btn-zoom-out" class="btn btn-sm" title="Zoom Out (Ctrl+-)">−</button>
+            <button id="btn-zoom-reset" class="btn btn-sm" title="Reset Zoom (Ctrl+0)">100%</button>
+            <button id="btn-zoom-in" class="btn btn-sm" title="Zoom In (Ctrl++)">+</button>
+          </div>
           <button id="btn-export" class="btn btn-primary" title="Export PDF (Ctrl+E)">Export PDF</button>
+          <button id="btn-settings" class="btn btn-icon" title="Settings">⚙</button>
         </div>
       </header>
 
       <main class="workspace">
+        <aside id="sidebar" class="sidebar">
+          <div class="sidebar-section">
+            <div class="sidebar-header">
+              <span>Files</span>
+              <div class="sidebar-actions">
+                <button id="btn-new-file" class="btn btn-sm" title="New File">+ File</button>
+                <button id="btn-new-folder" class="btn btn-sm" title="New Folder">+ Folder</button>
+              </div>
+            </div>
+            <div id="file-tree" class="sidebar-tree"></div>
+          </div>
+          <div class="sidebar-section">
+            <div class="sidebar-header">
+              <span>Outline</span>
+            </div>
+            <div id="outline-tree" class="sidebar-tree"></div>
+          </div>
+        </aside>
+
         <div id="editor" class="editor-pane"></div>
         <div id="splitter" class="splitter" role="separator" aria-orientation="vertical" tabindex="0"></div>
         <div class="preview-pane">
@@ -44,6 +72,44 @@
         <span class="status-item">Typst 0.15.1</span>
       </footer>
     </div>
+
+    <!-- Settings Modal -->
+    <div id="modal-settings" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <h3 class="modal-title">Settings</h3>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="setting-theme">Theme</label>
+            <select id="setting-theme" class="form-select">
+              <option value="system">System Default</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="setting-fontsize">Editor Font Size (px)</label>
+            <input id="setting-fontsize" type="number" min="10" max="32" class="form-input" value="13.5" />
+          </div>
+          <div class="form-group" style="flex-direction: row; align-items: center; gap: 8px;">
+            <input id="setting-autosave" type="checkbox" id="setting-autosave" checked />
+            <label for="setting-autosave" style="margin: 0; cursor: pointer;">Enable Autosave (1s idle)</label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="btn-settings-cancel" class="btn">Cancel</button>
+          <button id="btn-settings-save" class="btn btn-primary">Save Settings</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Open Modal -->
+    <div id="modal-quick-open" class="modal-backdrop hidden">
+      <div class="quick-open-modal">
+        <input id="quick-open-input" class="quick-open-input" type="text" placeholder="Type a file name to open..." />
+        <div id="quick-open-list" class="quick-open-list"></div>
+      </div>
+    </div>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
