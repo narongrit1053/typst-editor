@@ -19,6 +19,7 @@
           <button id="btn-sidebar" class="btn btn-icon" title="Toggle Sidebar (Ctrl+B)">☰</button>
           <button id="btn-open-folder" class="btn" title="Open Folder">Open Folder...</button>
           <button id="btn-open" class="btn" title="Open File (Ctrl+O)">Open File...</button>
+          <button id="btn-templates" class="btn" title="Template Market">Templates</button>
           <span id="file-name" class="file-name" title="No file open">No file open</span>
         </div>
         <div class="toolbar-right">
@@ -129,6 +130,43 @@
       <div class="quick-open-modal">
         <input id="quick-open-input" class="quick-open-input" type="text" placeholder="Type a file name to open..." />
         <div id="quick-open-list" class="quick-open-list"></div>
+      </div>
+    </div>
+
+    <!-- Template Market View (Full-window) -->
+    <div id="template-market-view" class="template-market-view hidden">
+      <header class="template-market-header">
+        <button id="btn-template-back" class="btn">← Back</button>
+        <strong style="font-size: 15px;">Templates</strong>
+        <input id="template-search" class="template-search-input" type="text" placeholder="🔍 Search templates..." />
+        <div class="spacer"></div>
+        <div id="template-pills" class="template-pills">
+          <button class="pill-btn active" data-category="All">All</button>
+          <button class="pill-btn" data-category="Thesis">Thesis</button>
+          <button class="pill-btn" data-category="Paper">Paper</button>
+          <button class="pill-btn" data-category="Report">Report</button>
+          <button class="pill-btn" data-category="CV">CV</button>
+          <button class="pill-btn" data-category="Slides">Slides</button>
+          <button class="pill-btn" data-category="My templates">My templates</button>
+        </div>
+        <button id="btn-save-as-template" class="btn btn-sm" title="Save current project to My templates">Save as template</button>
+      </header>
+      <div id="template-grid" class="template-grid"></div>
+    </div>
+
+    <!-- Template Details Modal -->
+    <div id="modal-template-details" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <h3 id="template-detail-title" class="modal-title">Template Details</h3>
+        <div class="modal-body">
+          <div id="template-detail-meta" style="color: var(--muted); font-size: 12px; margin-bottom: 8px;"></div>
+          <div id="template-detail-author" style="color: var(--ink); font-size: 12.5px; margin-bottom: 8px;"></div>
+          <p id="template-detail-desc" style="font-size: 13px; line-height: 1.5; margin: 0;"></p>
+        </div>
+        <div class="modal-footer">
+          <button id="btn-template-detail-close" class="btn">Close</button>
+          <button id="btn-template-detail-use" class="btn btn-primary">Use Template</button>
+        </div>
       </div>
     </div>
 

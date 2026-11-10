@@ -24,6 +24,7 @@ import {
   getCachedSettings,
   checkForUpdates,
 } from "./settings";
+import { initTemplateMarket, openTemplateMarket } from "./templates";
 
 let lspConnection: LspConnection | null = null;
 let editor: EditorHandle | null = null;
@@ -754,6 +755,18 @@ window.addEventListener("DOMContentLoaded", async () => {
   const btnOpenFolder = document.getElementById("btn-open-folder");
   btnOpenFolder?.addEventListener("click", () => {
     openFolder().catch(console.error);
+  });
+
+  // Template market
+  initTemplateMarket(async (targetDir) => {
+    await openFolder(targetDir);
+  });
+
+  const btnTemplates = document.getElementById("btn-templates");
+  btnTemplates?.addEventListener("click", () => {
+    openTemplateMarket(async (targetDir) => {
+      await openFolder(targetDir);
+    });
   });
 
   // Format button
