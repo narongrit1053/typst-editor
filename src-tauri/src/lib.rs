@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 use std::sync::Mutex;
 
+pub mod lsp_frame;
+
 pub struct LspProcess;
 
 pub struct AppState {
