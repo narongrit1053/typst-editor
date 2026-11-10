@@ -6,6 +6,7 @@ import { connectLsp, LspConnection } from "./lsp";
 import { createEditor, EditorHandle } from "./editor";
 import { startPreview, stopPreview } from "./preview";
 import { detectEol, withEol, createSaver, Saver } from "./document";
+import { renderProblems, summarise } from "./problems";
 
 let lspConnection: LspConnection | null = null;
 let editor: EditorHandle | null = null;
@@ -144,6 +145,19 @@ export async function openFile(filePath?: string) {
     editor.onCursor((line, col) => {
       if (statusPos) {
         statusPos.textContent = `Ln ${line}, Col ${col}`;
+      }
+    });
+
+    editor.onDiagnostics((problems) => {
+      const problemsEl = document.getElementById("problems");
+      const statusState = document.getElementById("status-state");
+      if (problemsEl) {
+        renderProblems(problemsEl, problems, folder, (p) => {
+          editor?.jumpTo(p.line, p.col);
+        });
+      }
+      if (statusState) {
+        statusState.textContent = summarise(problems);
       }
     });
   }
