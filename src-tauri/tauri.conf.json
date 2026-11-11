@@ -40,7 +40,7 @@
     "windows": {
       "nsis": {
         "installerIcon": "icons/icon.ico",
-        "languages": ["en-US"]
+        "languages": ["English"]
       }
     },
     "icon": [
