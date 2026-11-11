@@ -44,6 +44,34 @@ export function resetZoom(frame: HTMLIFrameElement): number {
   return currentZoom;
 }
 
+// Asks the preview page (via src-tauri/src/preview_flash.js) for a standalone HTML copy of what it renders.
+export function requestPreviewHtml(frame: HTMLIFrameElement, title: string, timeoutMs = 5000): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const target = frame?.contentWindow;
+    if (!target || !isPreviewRunning) {
+      reject(new Error("PREVIEW_NOT_READY"));
+      return;
+    }
+    const id = `${Date.now()}-${Math.random()}`;
+    const onMessage = (event: MessageEvent) => {
+      if (event.source !== target || event.data?.type !== "kong-export-html-result" || event.data.id !== id) return;
+      cleanup();
+      if (event.data.error) reject(new Error(event.data.error));
+      else resolve(String(event.data.html));
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error("PREVIEW_NOT_READY"));
+    }, timeoutMs);
+    const cleanup = () => {
+      clearTimeout(timer);
+      window.removeEventListener("message", onMessage);
+    };
+    window.addEventListener("message", onMessage);
+    target.postMessage({ type: "kong-export-html", id, title }, "*");
+  });
+}
+
 export function handlePreviewMessage(data: any, onJumpToSource?: (file: string, line: number, col: number) => void): boolean {
   if (!data || typeof data !== "object") return false;
   if (data.type === "jumpTo" || data.event === "editorScrollTo") {

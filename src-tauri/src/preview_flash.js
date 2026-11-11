@@ -52,6 +52,55 @@
     true,
   );
 
+  // HTML export: the app sends "kong-export-html"; we answer with a standalone page built from what
+  // the preview renders — vector SVG pages plus Tinymist's transparent text layer, so the result
+  // looks exactly like the preview while text stays selectable/searchable and links still work.
+  window.addEventListener("message", (e) => {
+    if (e.source !== parent || e.data?.type !== "kong-export-html") return;
+    const reply = (payload) => parent.postMessage({ type: "kong-export-html-result", id: e.data.id, ...payload }, "*");
+    const svgEl = document.querySelector("#typst-app > svg");
+    // Glyph outlines and clip paths live in a separate shared SVG that the pages <use>.
+    const resources = document.getElementById("typst-svg-resources");
+    if (!svgEl || !resources) return reply({ error: "The preview has not rendered yet." });
+    const xml = new XMLSerializer();
+    const tag = xml.serializeToString(svgEl);
+    const openEnd = tag.indexOf(">");
+    // Replace the viewer's fixed on-screen size so the page scales with the window via its viewBox.
+    const svg =
+      tag.slice(0, openEnd).replace(/\s(width|height|style|data-applied-[a-z-]+)="[^"]*"/g, "") +
+      ' style="display:block;width:100%;height:auto"' +
+      tag.slice(openEnd);
+    const styles = [...document.querySelectorAll("style")]
+      .map((s) => s.textContent)
+      .join("\n")
+      .replace(/\.hover \.typst-text\s*\{[^}]*\}/g, "") // preview-only hover highlighting
+      .replace(/\.typst-text:hover\s*\{[^}]*\}/g, "");
+    const pageWidthPx = Math.round(((Number(svgEl.getAttribute("data-width")) || 595) * 96) / 72);
+    const title = (e.data.title || document.title || "Document").replace(/[<&]/g, (c) => (c === "<" ? "&lt;" : "&amp;"));
+    reply({
+      html: `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${title}</title>
+<style>
+${styles}
+/* The preview page pins html/body to the viewport; a document should scroll normally. */
+html, body { margin: 0; width: auto; height: auto; background: #e8e8ec; }
+body { padding: 24px 12px; }
+.typst-export { width: 100%; max-width: ${pageWidthPx}px; margin: 0 auto; }
+</style>
+</head>
+<body>
+${xml.serializeToString(resources)}
+<div class="typst-export">${svg}</div>
+</body>
+</html>
+`,
+    });
+  });
+
   const css = `
     .typst-jump-ripple { visibility: hidden !important; }
     .kong-flash {

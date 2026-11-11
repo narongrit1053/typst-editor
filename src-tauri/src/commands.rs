@@ -89,6 +89,191 @@ pub fn export_args(
     args
 }
 
+/// Writes the HTML export built from the live preview (see preview_flash.js). The path comes
+/// from the user's save dialog; only .html targets are accepted.
+#[tauri::command]
+pub fn save_html_export(out: String, contents: String) -> Result<(), String> {
+    let path = Path::new(&out);
+    let is_html = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case("html") || e.eq_ignore_ascii_case("htm"));
+    if !is_html {
+        return Err("HTML export must be saved as a .html file".to_string());
+    }
+    write_file_atomic(path, &contents)
+}
+
+/// Plain text of a Typst content value as serialized by `typst query`.
+fn content_text(v: &serde_json::Value) -> String {
+    match v {
+        serde_json::Value::String(s) => s.clone(),
+        serde_json::Value::Array(items) => items.iter().map(content_text).collect(),
+        serde_json::Value::Object(o) => {
+            if o.get("func").and_then(|f| f.as_str()) == Some("space") {
+                return " ".to_string();
+            }
+            if let Some(t) = o.get("text").and_then(|t| t.as_str()) {
+                return t.to_string();
+            }
+            ["body", "children", "child"].iter().filter_map(|k| o.get(*k)).map(content_text).collect()
+        }
+        _ => String::new(),
+    }
+}
+
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+}
+
+/// Prepares Typst's semantic HTML for Pandoc. Typst drops what it can't express in HTML (e.g.
+/// templates that `place` figures), so each `<figure>` gets its caption and label back from
+/// `typst query figure`, matched by document order. Existing "Figure 1: ..." captions are
+/// replaced by the bare caption because LaTeX numbers figures itself.
+pub fn prepare_html_for_latex(html: &str, figures: &[serde_json::Value]) -> String {
+    let mut out = html.replace("<meta name=\"authors\"", "<meta name=\"author\"");
+    let mut search_from = 0;
+    let mut renamed: Vec<(String, String)> = Vec::new();
+    for fig in figures {
+        let Some(start) = out[search_from..].find("<figure").map(|i| i + search_from) else { break };
+        let Some(open_end) = out[start..].find('>').map(|i| i + start + 1) else { break };
+        let Some(close) = out[open_end..].find("</figure>").map(|i| i + open_end) else { break };
+
+        let caption = fig.get("caption").and_then(|c| c.get("body")).map(content_text).unwrap_or_default();
+        let mut inner = out[open_end..close].to_string();
+        if let Some(cap_start) = inner.find("<figcaption") {
+            if let Some(cap_end) = inner.find("</figcaption>") {
+                inner.replace_range(cap_start..cap_end + "</figcaption>".len(), "");
+            }
+        }
+        if !caption.trim().is_empty() {
+            inner.push_str(&format!("<figcaption>{}</figcaption>", html_escape(caption.trim())));
+        }
+
+        let mut open_tag = out[start..open_end].to_string();
+        let label = fig.get("label").and_then(|l| l.as_str()).map(|l| l.trim_matches(|c| c == '<' || c == '>'));
+        if let Some(label) = label.filter(|l| !l.is_empty()) {
+            // Use the Typst label as the figure id so \label{fig:x} matches the source.
+            let new_id = html_escape(label).replace('"', "");
+            match open_tag.split("id=\"").nth(1).and_then(|r| r.split('"').next()).map(str::to_string) {
+                Some(old) => {
+                    open_tag = open_tag.replace(&format!("id=\"{old}\""), &format!("id=\"{new_id}\""));
+                    renamed.push((old, new_id));
+                }
+                None => open_tag = open_tag.replacen("<figure", &format!("<figure id=\"{new_id}\""), 1),
+            }
+        }
+        let rebuilt = format!("{open_tag}{inner}");
+        out.replace_range(start..close, &rebuilt);
+        search_from = start + rebuilt.len() + "</figure>".len();
+    }
+    for (old, new) in renamed {
+        out = out.replace(&format!("href=\"#{old}\""), &format!("href=\"#{new}\""));
+    }
+    // Typst writes the image's pixel size; Pandoc would turn that into a physical size at 96 dpi.
+    // Without it, LaTeX scales the image to fit the text width.
+    let mut pos = 0;
+    while let Some(i) = out[pos..].find("<img").map(|i| i + pos) {
+        let end = out[i..].find('>').map(|e| e + i).unwrap_or(out.len());
+        let mut tag = out[i..end].to_string();
+        for attr in ["width", "height"] {
+            if let Some(a) = tag.find(&format!(" {attr}=\"")) {
+                if let Some(b) = tag[a + attr.len() + 3..].find('"') {
+                    tag.replace_range(a..a + attr.len() + 3 + b + 1, "");
+                }
+            }
+        }
+        out.replace_range(i..end, &tag);
+        pos = i + tag.len();
+    }
+    out
+}
+
+fn run_tool(mut cmd: Command, not_found: &str) -> Result<Vec<u8>, String> {
+    #[cfg(windows)]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    let output = cmd.output().map_err(|e| {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            not_found.to_string()
+        } else {
+            e.to_string()
+        }
+    })?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let msg: Vec<&str> = stderr
+            .lines()
+            .map(str::trim)
+            .filter(|l| l.starts_with("error"))
+            .chain(stderr.lines().map(str::trim).filter(|l| !l.is_empty()))
+            .take(3)
+            .collect();
+        return Err(msg.join("\n"));
+    }
+    Ok(output.stdout)
+}
+
+/// Typst has no LaTeX backend. Typst itself evaluates the document (so Typst Universe packages
+/// work) into semantic HTML with MathML math, then Pandoc turns that into LaTeX. Embedded images
+/// are written next to the .tex file in `<name>_media/`.
+#[tauri::command]
+pub fn export_latex(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    main: String,
+    out: String,
+    custom_binary: Option<String>,
+) -> Result<(), String> {
+    let root_guard = state.root.lock().map_err(|e| e.to_string())?;
+    let root = root_guard.as_ref().ok_or_else(|| "NO_ROOT".to_string())?.clone();
+    drop(root_guard);
+    let main_path = resolve_inside(&root, Path::new(&main))?;
+    let bin = custom_binary.filter(|s| !s.trim().is_empty()).unwrap_or_else(|| "typst".to_string());
+    let fonts = ensure_app_fonts(Some(&app)).ok();
+    latex_export(&bin, &root, fonts.as_deref(), &main_path, Path::new(&out))
+}
+
+pub fn latex_export(bin: &str, root: &Path, fonts: Option<&Path>, main_path: &Path, out_path: &Path) -> Result<(), String> {
+    let typst = |args: &[&std::ffi::OsStr]| {
+        let mut cmd = Command::new(bin);
+        cmd.args(args).arg("--root").arg(root);
+        if let Some(f) = fonts {
+            cmd.arg("--font-path").arg(f);
+        }
+        cmd
+    };
+
+    let tmp = std::env::temp_dir().join(format!("typst-editor-tex-{}", std::process::id()));
+    fs::create_dir_all(&tmp).map_err(|e| e.to_string())?;
+    let html_file = tmp.join("doc.html");
+    let result = (|| {
+        run_tool(
+            typst(&["compile".as_ref(), main_path.as_os_str(), html_file.as_os_str(), "--features".as_ref(), "html".as_ref()]),
+            "TYPST_NOT_FOUND",
+        )?;
+        let figures_json = run_tool(typst(&["query".as_ref(), main_path.as_os_str(), "figure".as_ref()]), "TYPST_NOT_FOUND")?;
+        let figures: Vec<serde_json::Value> = serde_json::from_slice(&figures_json).unwrap_or_default();
+        let html = fs::read_to_string(&html_file).map_err(|e| e.to_string())?;
+        fs::write(&html_file, prepare_html_for_latex(&html, &figures)).map_err(|e| e.to_string())?;
+
+        let stem = out_path.file_stem().and_then(|s| s.to_str()).unwrap_or("document");
+        let mut pandoc = Command::new("pandoc");
+        pandoc
+            .args(["--from", "html", "--to", "latex", "--standalone", "--shift-heading-level-by=-1"])
+            .arg(format!("--extract-media={stem}_media"))
+            .arg("--output")
+            .arg(out_path)
+            .arg(&html_file);
+        // Relative media paths in the .tex resolve from the .tex file's folder.
+        if let Some(dir) = out_path.parent().filter(|d| !d.as_os_str().is_empty()) {
+            pandoc.current_dir(dir);
+        }
+        run_tool(pandoc, "PANDOC_NOT_FOUND").map(|_| ())
+    })();
+    let _ = fs::remove_dir_all(&tmp);
+    result
+}
+
 pub fn list_directory(target_dir: &Path) -> Result<Vec<FileEntry>, String> {
     let mut entries = Vec::new();
     let read_dir = fs::read_dir(target_dir).map_err(|e| e.to_string())?;
@@ -815,6 +1000,57 @@ mod tests {
             Some(Path::new("fonts")),
         );
         assert_eq!(&b[5..], ["--font-path", "fonts"].map(OsString::from));
+    }
+
+    #[test]
+    fn test_save_html_export_rejects_other_extensions() {
+        let dir = tempdir().unwrap();
+        let bad = dir.path().join("x.exe");
+        assert!(save_html_export(bad.to_string_lossy().into(), "x".into()).is_err());
+        assert!(!bad.exists());
+        let good = dir.path().join("x.HTML");
+        save_html_export(good.to_string_lossy().into(), "<p>ok</p>".into()).unwrap();
+        assert_eq!(fs::read_to_string(good).unwrap(), "<p>ok</p>");
+    }
+
+    /// End-to-end LaTeX export (needs typst + pandoc). Run with:
+    /// LATEX_E2E_MAIN=path/to/doc.typ cargo test latex_export_e2e -- --ignored
+    #[test]
+    #[ignore]
+    fn latex_export_e2e() {
+        let main = PathBuf::from(std::env::var("LATEX_E2E_MAIN").expect("set LATEX_E2E_MAIN"));
+        let root = main.parent().unwrap().to_path_buf();
+        let out = root.join("e2e_out.tex");
+        let fonts = ensure_app_fonts(None).ok();
+        latex_export("typst", &root, fonts.as_deref(), &main, &out).unwrap();
+        assert!(fs::read_to_string(&out).unwrap().contains("\\begin{document}"));
+    }
+
+    #[test]
+    fn test_prepare_html_for_latex() {
+        let html = concat!(
+            "<meta name=\"authors\" content=\"A, B\">",
+            "<p>See <a href=\"#loc-3\">Fig. 1</a></p>",
+            "<figure id=\"loc-3\"></figure>",
+            "<figure><img src=\"x.png\" width=\"640\" height=\"480\" style=\"display: block\"><figcaption>Figure 2: Old & caption</figcaption></figure>",
+        );
+        let figures: Vec<serde_json::Value> = serde_json::from_str(
+            r#"[
+              {"label": "<fig:a>", "caption": {"body": {"func": "sequence", "children": [
+                {"func": "text", "text": "Placed"}, {"func": "space"}, {"func": "text", "text": "plot <1>"}]}}},
+              {"caption": {"body": {"func": "text", "text": "Real & image"}}}
+            ]"#,
+        )
+        .unwrap();
+        assert_eq!(
+            prepare_html_for_latex(html, &figures),
+            concat!(
+                "<meta name=\"author\" content=\"A, B\">",
+                "<p>See <a href=\"#fig:a\">Fig. 1</a></p>",
+                "<figure id=\"fig:a\"><figcaption>Placed plot &lt;1&gt;</figcaption></figure>",
+                "<figure><img src=\"x.png\" style=\"display: block\"><figcaption>Real &amp; image</figcaption></figure>",
+            )
+        );
     }
 
     #[test]

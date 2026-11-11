@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { zoomIn, zoomOut, resetZoom, getZoom, setZoomLevel, handlePreviewMessage, startPreview, stopPreview } from "./preview";
+import { zoomIn, zoomOut, resetZoom, getZoom, setZoomLevel, handlePreviewMessage, startPreview, stopPreview, requestPreviewHtml } from "./preview";
 import { LspConnection } from "./lsp";
 
 describe("preview zoom and controls", () => {
@@ -118,5 +118,14 @@ describe("preview zoom and controls", () => {
     await startPreview(fakeFrame, fakeLsp, "D:/Try/Typst/paper.typ");
     expect(callCount).toBe(3);
     expect(fakeFrame.src).toBe("http://127.0.0.1:61234/");
+  });
+});
+
+describe("requestPreviewHtml", () => {
+  it("rejects when the preview is not running", async () => {
+    await stopPreview();
+    const frame: any = { contentWindow: { postMessage: vi.fn() } };
+    await expect(requestPreviewHtml(frame, "doc")).rejects.toThrow("PREVIEW_NOT_READY");
+    expect(frame.contentWindow.postMessage).not.toHaveBeenCalled();
   });
 });

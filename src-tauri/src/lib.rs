@@ -43,6 +43,8 @@ pub fn run() {
             commands::load_app_settings,
             commands::save_app_settings,
             commands::export_file,
+            commands::export_latex,
+            commands::save_html_export,
             commands::check_typst,
             commands::check_app_update,
             commands::download_and_launch_installer,

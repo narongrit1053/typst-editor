@@ -12,6 +12,7 @@ import {
   resetZoom,
   setZoomLevel,
   initPreviewSync,
+  requestPreviewHtml,
 } from "./preview";
 import { detectEol, withEol, createSaver, Saver } from "./document";
 import { renderProblems, summarise } from "./problems";
@@ -587,7 +588,15 @@ export function extractDialogPath(result: unknown): string | null {
   return null;
 }
 
-export async function exportDocument(format: "pdf" | "png" | "svg" = "pdf") {
+const EXPORT_FILTER_NAMES = {
+  pdf: "PDF Document",
+  png: "PNG Image",
+  svg: "SVG Image",
+  html: "HTML Page",
+  tex: "LaTeX Document",
+} as const;
+
+export async function exportDocument(format: keyof typeof EXPORT_FILTER_NAMES = "pdf") {
   const targetExport = pinnedFilePath || currentFilePath;
   if (!targetExport) {
     showBanner("Please open a document first to export.", false);
@@ -607,7 +616,7 @@ export async function exportDocument(format: "pdf" | "png" | "svg" = "pdf") {
   const isImage = format === "png" || format === "svg";
   const baseNoExt = targetExport.replace(/\.[^/\\.]+$/, "");
   const defaultPath = isImage ? `${baseNoExt}_{0p}.${defaultExt}` : `${baseNoExt}.${defaultExt}`;
-  const filterName = format === "pdf" ? "PDF Document" : format === "png" ? "PNG Image" : "SVG Image";
+  const filterName = EXPORT_FILTER_NAMES[format];
   const selectedOut = await saveDialog({
     defaultPath,
     filters: [{ name: filterName, extensions: [defaultExt] }],
@@ -619,11 +628,25 @@ export async function exportDocument(format: "pdf" | "png" | "svg" = "pdf") {
   const statusState = document.getElementById("status-state");
   const settings = getCachedSettings();
   try {
-    await invoke("export_file", {
-      main: targetExport,
-      out: outPath,
-      customBinary: settings.customTypstPath || null,
-    });
+    if (format === "tex") {
+      await invoke("export_latex", {
+        main: targetExport,
+        out: outPath,
+        customBinary: settings.customTypstPath || null,
+      });
+    } else if (format === "html") {
+      // Built from the live preview so the page matches it exactly (vector pages + real text).
+      const frame = document.getElementById("preview") as HTMLIFrameElement;
+      const title = (targetExport.split(/[\\/]/).pop() || "Document").replace(/\.typ$/i, "");
+      const contents = await requestPreviewHtml(frame, title);
+      await invoke("save_html_export", { out: outPath, contents });
+    } else {
+      await invoke("export_file", {
+        main: targetExport,
+        out: outPath,
+        customBinary: settings.customTypstPath || null,
+      });
+    }
     hideBanner();
     const fileName = outPath.split(/[\\/]/).pop() || outPath;
     if (statusState) {
@@ -638,6 +661,12 @@ export async function exportDocument(format: "pdf" | "png" | "svg" = "pdf") {
         () => {
           document.getElementById("modal-settings")?.classList.remove("hidden");
         },
+      );
+    } else if (msg.includes("PREVIEW_NOT_READY")) {
+      showBanner("HTML export copies the live preview. Wait for the preview to finish rendering, then try again.");
+    } else if (msg.includes("PANDOC_NOT_FOUND")) {
+      showBanner(
+        "LaTeX export needs Pandoc. Install it (winget install JohnMacFarlane.Pandoc), then restart the app.",
       );
     } else {
       showBanner(`Export failed: ${msg}`);
@@ -1146,6 +1175,13 @@ function initApp() {
     exportMenu?.classList.add("hidden");
     exportDocument("svg").catch(console.error);
   });
+
+  for (const format of ["html", "tex"] as const) {
+    document.getElementById(`btn-export-${format}`)?.addEventListener("click", () => {
+      exportMenu?.classList.add("hidden");
+      exportDocument(format).catch(console.error);
+    });
+  }
 
   document.addEventListener("click", (e) => {
     if (exportMenu && !exportMenu.classList.contains("hidden")) {
