@@ -29,6 +29,8 @@ export interface DocComment {
   created: string;
   color: string;
   preview?: PreviewAnchor;
+  /** Where the user dragged the sticky note: its top-left as fractions [x, y] of the page. */
+  note?: number[];
   /** Its text could not be found; kept (and listed) until the user deletes it. */
   detached?: boolean;
 }
@@ -50,7 +52,11 @@ export function parseSidecar(json: string): DocComment[] {
   if (!data || !Array.isArray(data.comments)) throw new Error("Not a comments file");
   return data.comments
     .filter((x: any) => x && typeof x.id === "string" && typeof x.body === "string" && typeof x.quote === "string")
-    .map((x: any) => ({ ...x, color: x.color in COMMENT_COLORS ? x.color : "yellow" }));
+    .map((x: any) => {
+      const okNote = Array.isArray(x.note) && x.note.length === 2 && x.note.every(Number.isFinite);
+      const { note, ...rest } = x;
+      return { ...rest, color: x.color in COMMENT_COLORS ? x.color : "yellow", ...(okNote ? { note } : {}) };
+    });
 }
 
 export function serializeSidecar(comments: DocComment[]): string {

@@ -213,6 +213,8 @@ ${xml.serializeToString(resources)}
     .kong-palette[hidden] { display: none; }
     .kong-swatch { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #fff; outline: 1px solid #aaa; cursor: pointer; padding: 0; }
     .kong-swatch.active { outline: 2px solid #222; }
+    .kong-drag-handle { cursor: move; user-select: none; }
+    .kong-links { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
     .kong-tool-on #typst-container-main { cursor: text; }
     .kong-tool-on .tsel::selection { background: transparent; }
   `;
@@ -317,7 +319,13 @@ ${xml.serializeToString(resources)}
     };
     const isDraft = c.id === "__draft";
     const isEditing = isDraft || editing?.id === c.id;
+    if (!isDraft) {
+      head.classList.add("kong-drag-handle");
+      head.title = "Drag to move the note on this page";
+      head.addEventListener("mousedown", (e) => startNoteDrag(e, card, it));
+    }
     if (!isEditing) {
+      if (c.note) head.append(btn("↺", "Put the note back beside its text", () => moveNote(c, null)));
       head.append(
         btn("✎", "Edit note", () => {
           editing = { id: c.id, body: c.body };
@@ -376,9 +384,50 @@ ${xml.serializeToString(resources)}
     return card;
   }
 
+  // ---- Moving a sticky note (within its page; saved as fractions of the page) ----
+  let noteDrag = null; // { node, it, dx, dy, pos }
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(v, hi));
+
+  function startNoteDrag(e, node, it) {
+    if (e.button !== 0 || e.target.closest("button")) return;
+    e.preventDefault();
+    const r = node.getBoundingClientRect();
+    noteDrag = { node, it, dx: e.clientX - r.left, dy: e.clientY - r.top, pos: null };
+    layer?.querySelector(`[data-link="${CSS.escape(it.c.id)}"]`)?.remove();
+  }
+
+  function onNoteDragMove(e) {
+    if (!noteDrag) return;
+    const { node, it } = noteDrag;
+    const p = pageBox(it.page);
+    const host = scroller();
+    if (!p || !host) return;
+    const h = host.getBoundingClientRect();
+    const x = clamp(e.clientX - noteDrag.dx, p.left, p.right - node.offsetWidth);
+    const y = clamp(e.clientY - noteDrag.dy, p.top, p.bottom - node.offsetHeight);
+    node.style.left = `${x - h.left + host.scrollLeft}px`;
+    node.style.top = `${y - h.top + host.scrollTop}px`;
+    noteDrag.pos = [(x - p.left) / p.width, (y - p.top) / p.height];
+  }
+
+  function onNoteDragEnd() {
+    const d = noteDrag;
+    noteDrag = null;
+    if (!d) return;
+    if (d.pos) moveNote(d.it.c, d.pos.map((v) => Math.round(v * 1e4) / 1e4));
+    else redraw();
+  }
+
+  function moveNote(c, note) {
+    if (note) c.note = note;
+    else delete c.note;
+    toApp({ type: "kong-comment-move", id: c.id, note });
+    redraw();
+  }
+
   function redraw() {
     const host = scroller();
-    if (!host) return;
+    if (!host || noteDrag) return; // don't rebuild the note under the pointer
     if (getComputedStyle(host).position === "static") host.style.position = "relative";
     if (!layer || !layer.isConnected) {
       layer = el("div", "kong-comments-layer");
@@ -414,7 +463,13 @@ ${xml.serializeToString(resources)}
       }
     }
 
+    // Moved notes get a dashed line back to their highlight.
+    const links = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    links.setAttribute("class", "kong-links");
+    layer.appendChild(links);
+
     // Notes sit beside the page when there is room, else inside its right edge; stacked so they don't overlap.
+    // A note the user moved stays where it was dropped instead.
     placed.sort((a, b) => a.rects[0].top - b.rects[0].top);
     let bottom = -Infinity;
     for (const it of placed) {
@@ -437,6 +492,27 @@ ${xml.serializeToString(resources)}
       }
       layer.appendChild(node);
       const w = node.offsetWidth;
+      const pb = it.c.note && pageBox(it.page);
+      if (pb) {
+        const x = clamp(pb.left + it.c.note[0] * pb.width, pb.left, pb.right - w);
+        const y = clamp(pb.top + it.c.note[1] * pb.height, pb.top, pb.bottom - node.offsetHeight);
+        const [lx, ly] = local(x, y);
+        node.style.left = `${lx}px`;
+        node.style.top = `${ly}px`;
+        const r0 = it.rects[0];
+        const [hx, hy] = local(r0.left + r0.width / 2, r0.top + r0.height / 2);
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        line.setAttribute("data-link", it.c.id);
+        line.setAttribute("x1", hx);
+        line.setAttribute("y1", hy);
+        line.setAttribute("x2", clamp(hx, lx, lx + w));
+        line.setAttribute("y2", clamp(hy, ly, ly + node.offsetHeight));
+        line.setAttribute("stroke", color);
+        line.setAttribute("stroke-width", "2");
+        line.setAttribute("stroke-dasharray", "5 4");
+        links.appendChild(line);
+        continue;
+      }
       const viewRight = Math.min(h.right, innerWidth); // the host can be wider than the window
       const roomRight = viewRight - p.right >= w + 16;
       const [px] = local(roomRight ? p.right + 8 : Math.min(p.right, viewRight) - w - 8, 0);
@@ -634,6 +710,8 @@ ${xml.serializeToString(resources)}
     window.addEventListener("mousedown", onToolDown, true);
     window.addEventListener("mousemove", onToolMove, true);
     window.addEventListener("mouseup", onToolUp, true);
+    window.addEventListener("mousemove", onNoteDragMove);
+    window.addEventListener("mouseup", onNoteDragEnd);
     // While highlighting, a click must not also become a Tinymist jump.
     window.addEventListener("click", (e) => tool.on && !ours(e.target) && e.stopPropagation(), true);
     // Re-place everything after Tinymist re-renders or zooms (but not for our own drawing).

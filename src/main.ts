@@ -511,6 +511,15 @@ function editComment(id: string, body: string) {
   saveComments().catch((err) => showBanner(`Could not save comment: ${err?.message || err}`));
 }
 
+// A sticky note dragged on the preview (note = top-left as page fractions), or put back (null).
+function moveComment(id: string, note: unknown) {
+  const cm = comments.find((x) => x.id === id);
+  if (!cm) return;
+  if (Array.isArray(note) && note.length === 2 && note.every(Number.isFinite)) cm.note = note.map(Number);
+  else delete cm.note;
+  saveComments().catch((err) => showBanner(`Could not save comment: ${err?.message || err}`));
+}
+
 async function removeComment(id: string) {
   const cm = comments.find((x) => x.id === id);
   if (!cm) return;
@@ -594,6 +603,9 @@ function onPreviewCommentMessage(data: any) {
       break;
     case "kong-comment-delete":
       removeComment(String(data.id)).catch(console.error);
+      break;
+    case "kong-comment-move":
+      moveComment(String(data.id), data.note);
       break;
     case "kong-comment-select":
       selectComment(String(data.id));

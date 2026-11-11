@@ -44,6 +44,12 @@ describe("comments sidecar", () => {
     expect(parseSidecar(serializeSidecar([c({ preview })]))[0].preview).toEqual(preview);
   });
 
+  it("keeps a moved note's position and drops a malformed one", () => {
+    expect(parseSidecar(serializeSidecar([c({ note: [0.5, 0.25] })]))[0].note).toEqual([0.5, 0.25]);
+    const bad = JSON.stringify({ version: 1, comments: [{ ...c({}), note: ["x", 1] }] });
+    expect(parseSidecar(bad)[0].note).toBeUndefined();
+  });
+
   it("treats empty text as no comments", () => {
     expect(parseSidecar("")).toEqual([]);
   });
