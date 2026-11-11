@@ -1,0 +1,472 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-11T07:34:55+00:00",
+  "title": "Design System: Typst-Editor by Kong (landing page)",
+  "extensions": {
+    "colorMeta": {
+      "cloth": {
+        "role": "primary",
+        "displayName": "Bottle-Green Buckram",
+        "canonical": "#1e3b2c",
+        "tonalRamp": [
+          "oklch(15% 0.011 160)",
+          "oklch(26% 0.020 160)",
+          "oklch(38% 0.028 160)",
+          "oklch(49% 0.037 160)",
+          "oklch(61% 0.044 160)",
+          "oklch(72% 0.036 160)",
+          "oklch(84% 0.027 160)",
+          "oklch(95% 0.019 160)"
+        ]
+      },
+      "cloth-deep": {
+        "role": "primary",
+        "displayName": "Spine Shadow Green",
+        "canonical": "#132a1e",
+        "tonalRamp": [
+          "oklch(15% 0.009 160)",
+          "oklch(26% 0.016 160)",
+          "oklch(38% 0.023 160)",
+          "oklch(49% 0.031 160)",
+          "oklch(61% 0.037 160)",
+          "oklch(72% 0.030 160)",
+          "oklch(84% 0.023 160)",
+          "oklch(95% 0.016 160)"
+        ]
+      },
+      "foil": {
+        "role": "primary",
+        "displayName": "Dull Gold Foil",
+        "canonical": "#d8b765",
+        "tonalRamp": [
+          "oklch(15% 0.027 88)",
+          "oklch(26% 0.048 88)",
+          "oklch(38% 0.068 88)",
+          "oklch(49% 0.089 88)",
+          "oklch(61% 0.107 88)",
+          "oklch(72% 0.086 88)",
+          "oklch(84% 0.066 88)",
+          "oklch(95% 0.045 88)"
+        ]
+      },
+      "foil-bright": {
+        "role": "primary",
+        "displayName": "Bright Foil",
+        "canonical": "#f0d690",
+        "tonalRamp": [
+          "oklch(15% 0.023 90)",
+          "oklch(26% 0.041 90)",
+          "oklch(38% 0.059 90)",
+          "oklch(49% 0.076 90)",
+          "oklch(61% 0.092 90)",
+          "oklch(72% 0.074 90)",
+          "oklch(84% 0.057 90)",
+          "oklch(95% 0.039 90)"
+        ]
+      },
+      "link": {
+        "role": "secondary",
+        "displayName": "Library Green Ink",
+        "canonical": "#1d4a33",
+        "tonalRamp": [
+          "oklch(15% 0.016 159)",
+          "oklch(26% 0.028 159)",
+          "oklch(38% 0.040 159)",
+          "oklch(49% 0.053 159)",
+          "oklch(61% 0.063 159)",
+          "oklch(72% 0.051 159)",
+          "oklch(84% 0.039 159)",
+          "oklch(95% 0.027 159)"
+        ]
+      },
+      "link-deep": {
+        "role": "secondary",
+        "displayName": "Deep Library Green",
+        "canonical": "#163a28",
+        "tonalRamp": [
+          "oklch(15% 0.013 159)",
+          "oklch(26% 0.023 159)",
+          "oklch(38% 0.034 159)",
+          "oklch(49% 0.044 159)",
+          "oklch(61% 0.052 159)",
+          "oklch(72% 0.042 159)",
+          "oklch(84% 0.032 159)",
+          "oklch(95% 0.022 159)"
+        ]
+      },
+      "hl-yellow": {
+        "role": "tertiary",
+        "displayName": "Highlighter Yellow",
+        "canonical": "#ffd54a",
+        "tonalRamp": [
+          "oklch(15% 0.039 92)",
+          "oklch(26% 0.069 92)",
+          "oklch(38% 0.099 92)",
+          "oklch(49% 0.129 92)",
+          "oklch(61% 0.155 92)",
+          "oklch(72% 0.125 92)",
+          "oklch(84% 0.095 92)",
+          "oklch(95% 0.065 92)"
+        ]
+      },
+      "hl-green": {
+        "role": "tertiary",
+        "displayName": "Highlighter Green",
+        "canonical": "#7bd88f",
+        "tonalRamp": [
+          "oklch(15% 0.034 149)",
+          "oklch(26% 0.060 149)",
+          "oklch(38% 0.086 149)",
+          "oklch(49% 0.112 149)",
+          "oklch(61% 0.135 149)",
+          "oklch(72% 0.109 149)",
+          "oklch(84% 0.083 149)",
+          "oklch(95% 0.057 149)"
+        ]
+      },
+      "hl-blue": {
+        "role": "tertiary",
+        "displayName": "Highlighter Blue",
+        "canonical": "#6cb6ff",
+        "tonalRamp": [
+          "oklch(15% 0.032 250)",
+          "oklch(26% 0.057 250)",
+          "oklch(38% 0.082 250)",
+          "oklch(49% 0.106 250)",
+          "oklch(61% 0.128 250)",
+          "oklch(72% 0.103 250)",
+          "oklch(84% 0.078 250)",
+          "oklch(95% 0.054 250)"
+        ]
+      },
+      "hl-pink": {
+        "role": "tertiary",
+        "displayName": "Highlighter Pink",
+        "canonical": "#ff8fc8",
+        "tonalRamp": [
+          "oklch(15% 0.037 349)",
+          "oklch(26% 0.066 349)",
+          "oklch(38% 0.094 349)",
+          "oklch(49% 0.123 349)",
+          "oklch(61% 0.148 349)",
+          "oklch(72% 0.119 349)",
+          "oklch(84% 0.091 349)",
+          "oklch(95% 0.062 349)"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Bond Paper",
+        "canonical": "#fdfdfb",
+        "tonalRamp": [
+          "oklch(15% 0.001 106)",
+          "oklch(26% 0.001 106)",
+          "oklch(38% 0.002 106)",
+          "oklch(49% 0.002 106)",
+          "oklch(61% 0.003 106)",
+          "oklch(72% 0.002 106)",
+          "oklch(84% 0.002 106)",
+          "oklch(95% 0.001 106)"
+        ]
+      },
+      "paper-edge": {
+        "role": "neutral",
+        "displayName": "Paper Edge",
+        "canonical": "#e9e8e1",
+        "tonalRamp": [
+          "oklch(15% 0.002 100)",
+          "oklch(26% 0.004 100)",
+          "oklch(38% 0.006 100)",
+          "oklch(49% 0.008 100)",
+          "oklch(61% 0.009 100)",
+          "oklch(72% 0.008 100)",
+          "oklch(84% 0.006 100)",
+          "oklch(95% 0.004 100)"
+        ]
+      },
+      "label": {
+        "role": "neutral",
+        "displayName": "Spine-Label White",
+        "canonical": "#f7f6f0",
+        "tonalRamp": [
+          "oklch(15% 0.002 99)",
+          "oklch(26% 0.004 99)",
+          "oklch(38% 0.005 99)",
+          "oklch(49% 0.007 99)",
+          "oklch(61% 0.008 99)",
+          "oklch(72% 0.006 99)",
+          "oklch(84% 0.005 99)",
+          "oklch(95% 0.003 99)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Thesis Ink",
+        "canonical": "#18181a",
+        "tonalRamp": [
+          "oklch(15% 0.001 286)",
+          "oklch(26% 0.002 286)",
+          "oklch(38% 0.002 286)",
+          "oklch(49% 0.003 286)",
+          "oklch(61% 0.004 286)",
+          "oklch(72% 0.003 286)",
+          "oklch(84% 0.002 286)",
+          "oklch(95% 0.002 286)"
+        ]
+      },
+      "ink-soft": {
+        "role": "neutral",
+        "displayName": "Soft Ink",
+        "canonical": "#46464b",
+        "tonalRamp": [
+          "oklch(15% 0.002 286)",
+          "oklch(26% 0.004 286)",
+          "oklch(38% 0.005 286)",
+          "oklch(49% 0.007 286)",
+          "oklch(61% 0.008 286)",
+          "oklch(72% 0.007 286)",
+          "oklch(84% 0.005 286)",
+          "oklch(95% 0.003 286)"
+        ]
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Hairline Rule",
+        "canonical": "#cfcfc8",
+        "tonalRamp": [
+          "oklch(15% 0.002 107)",
+          "oklch(26% 0.004 107)",
+          "oklch(38% 0.006 107)",
+          "oklch(49% 0.008 107)",
+          "oklch(61% 0.009 107)",
+          "oklch(72% 0.008 107)",
+          "oklch(84% 0.006 107)",
+          "oklch(95% 0.004 107)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Foil title on the front board; small-caps bold."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Numbered chapter openers."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Numbered sections and list headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Running text on paper, 68ch, indented paragraphs."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Numbered figure and table captions."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "All-small-caps running heads, cover points, spine title."
+      },
+      "label-sans": {
+        "displayName": "Label Sans",
+        "purpose": "Spine label and comment-demo controls only."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Inline code, keys and command blocks."
+      }
+    },
+    "shadows": [
+      {
+        "name": "page-drop",
+        "value": "0 18px 30px -18px rgba(0,0,0,0.8)",
+        "purpose": "Spreads and plates on cloth; always with a 1px paper-edge bottom border."
+      },
+      {
+        "name": "label-rest",
+        "value": "0 2px 4px rgba(0,0,0,0.35), 0 8px 18px -8px rgba(0,0,0,0.55)",
+        "purpose": "Spine label at rest."
+      },
+      {
+        "name": "label-hover",
+        "value": "0 4px 8px rgba(0,0,0,0.35), 0 14px 26px -10px rgba(0,0,0,0.6)",
+        "purpose": "Spine label lifted 2px on hover."
+      },
+      {
+        "name": "sticky-note",
+        "value": "0 4px 14px rgba(0,0,0,0.18)",
+        "purpose": "Comment notes beside the demo text."
+      },
+      {
+        "name": "cloth-fold",
+        "value": "inset 0 12px 20px -12px rgba(0,0,0,0.7)",
+        "purpose": "Inner top edge of the case; the back cover uses inset 0 14px 22px -14px rgba(0,0,0,0.75)."
+      },
+      {
+        "name": "blind-stamp",
+        "value": "inset 0 1px 2px rgba(0,0,0,0.5), 0 1px 0 rgba(255,236,180,0.08)",
+        "purpose": "The foil frame's pressed double rule on the front board."
+      },
+      {
+        "name": "spine-round",
+        "value": "inset -2px 0 0 rgba(0,0,0,0.45), 6px 0 14px -6px rgba(0,0,0,0.6)",
+        "purpose": "Spine edge against the board; paired with a horizontal shading gradient."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out-expo",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "All state transitions: label lift (160ms), sticky-note repositioning (220ms)."
+      },
+      {
+        "name": "board-open",
+        "value": "scroll-linked rotateY(0 to -72deg) with brightness(0.55), over 0 to 80vh of root scroll, transform-origin left center",
+        "purpose": "The front board swings open on its spine as the cover scrolls away. Only with animation-timeline support, above 720px, and without reduced motion."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "prefers-reduced-motion: reduce",
+        "purpose": "No board swing; scroll-behavior auto instead of smooth."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "single-page",
+        "value": "720px"
+      },
+      {
+        "name": "board-motion-min",
+        "value": "721px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Spine Label",
+      "kind": "button",
+      "refersTo": "spine-label",
+      "description": "The pasted white library label; the download action on the spine, back cover and Installation chapter.",
+      "html": "<div class=\"ds-cloth\"><a class=\"ds-label\" href=\"#\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 3v12m0 0-5-5m5 5 5-5M4 19h16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg><span class=\"ds-label-main\">Download for Windows</span><span class=\"ds-label-sub\">v0.1.0 · 64-bit installer</span></a></div>",
+      "css": ":host{--cloth:#1e3b2c;--cloth-deep:#132a1e;--foil:#d8b765;--paper:#fdfdfb;--paper-edge:#e9e8e1;--label:#f7f6f0;--ink:#18181a;--ink-soft:#46464b;--rule:#cfcfc8;--link:#1d4a33;--hl-yellow:#ffd54a;--hl-green:#7bd88f;--hl-blue:#6cb6ff;--hl-pink:#ff8fc8;--serif:'Libertinus Serif','Times New Roman',serif;--sans:'Libertinus Sans','Segoe UI',sans-serif;} .ds-cloth{background:var(--cloth);padding:32px;display:flex;justify-content:center} .ds-label{display:inline-grid;justify-items:center;gap:0.2rem;padding:0.9rem 0.8rem 0.8rem;min-width:13rem;background:var(--label);color:var(--ink);text-decoration:none;font-family:var(--sans);text-align:center;border:1px solid #c9c6b6;border-radius:3px;box-shadow:0 2px 4px rgba(0,0,0,0.35),0 8px 18px -8px rgba(0,0,0,0.55);transition:transform 160ms cubic-bezier(0.16, 1, 0.3, 1),box-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1)} .ds-label svg{color:var(--link)} .ds-label:hover{transform:translateY(-2px);box-shadow:0 4px 8px rgba(0,0,0,0.35),0 14px 26px -10px rgba(0,0,0,0.6)} .ds-label:active{transform:translateY(0)} .ds-label:focus-visible{outline:2px solid var(--foil);outline-offset:3px} .ds-label-main{font-weight:700;font-size:1.05rem;line-height:1.15} .ds-label-sub{font-size:0.78rem;color:#4a4a44;letter-spacing:0.02em}"
+    },
+    {
+      "name": "Foil Link",
+      "kind": "nav",
+      "refersTo": "foil-link",
+      "description": "Underlined small-caps foil link on cloth.",
+      "html": "<div class=\"ds-cloth\"><a class=\"ds-foil-link\" href=\"#\">Open the book</a></div>",
+      "css": ":host{--cloth:#1e3b2c;--cloth-deep:#132a1e;--foil:#d8b765;--paper:#fdfdfb;--paper-edge:#e9e8e1;--label:#f7f6f0;--ink:#18181a;--ink-soft:#46464b;--rule:#cfcfc8;--link:#1d4a33;--hl-yellow:#ffd54a;--hl-green:#7bd88f;--hl-blue:#6cb6ff;--hl-pink:#ff8fc8;--serif:'Libertinus Serif','Times New Roman',serif;--sans:'Libertinus Sans','Segoe UI',sans-serif;} .ds-cloth{background:var(--cloth);padding:32px;text-align:center} .ds-foil-link{font-family:var(--serif);color:var(--foil);font-variant-caps:all-small-caps;letter-spacing:0.14em;font-size:1.2rem;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:0.3em;padding:0.3rem 0.2rem} .ds-foil-link:hover{color:#f0d690} .ds-foil-link:focus-visible{outline:2px solid var(--foil);outline-offset:3px;border-radius:2px}"
+    },
+    {
+      "name": "Contents Entry",
+      "kind": "nav",
+      "refersTo": "page",
+      "description": "Dot-leader contents rows; the site's navigation.",
+      "html": "<ol class=\"ds-toc\"><li><a href=\"#\"><span class=\"n\">1</span><span class=\"t\">Introduction</span><span class=\"p\">1</span></a></li><li><a href=\"#\"><span class=\"n\">2</span><span class=\"t\">Live preview and two-way jump</span><span class=\"p\">2</span></a></li><li><a href=\"#\"><span class=\"n\">3</span><span class=\"t\">Comments on the page</span><span class=\"p\">3</span></a></li></ol>",
+      "css": ":host{--cloth:#1e3b2c;--cloth-deep:#132a1e;--foil:#d8b765;--paper:#fdfdfb;--paper-edge:#e9e8e1;--label:#f7f6f0;--ink:#18181a;--ink-soft:#46464b;--rule:#cfcfc8;--link:#1d4a33;--hl-yellow:#ffd54a;--hl-green:#7bd88f;--hl-blue:#6cb6ff;--hl-pink:#ff8fc8;--serif:'Libertinus Serif','Times New Roman',serif;--sans:'Libertinus Sans','Segoe UI',sans-serif;} .ds-toc{list-style:none;margin:0;padding:24px;background:var(--paper);font-family:var(--serif);font-size:1.08rem;color:var(--ink)} .ds-toc li{margin:0.45rem 0} .ds-toc a{display:grid;grid-template-columns:2.6rem auto 1fr auto;align-items:baseline;color:var(--ink);text-decoration:none} .ds-toc .n,.ds-toc .t{font-weight:700} .ds-toc .p{grid-column:4;font-variant-numeric:lining-nums tabular-nums} .ds-toc a::after{content:'';grid-column:3;grid-row:1;margin:0 0.5rem;border-bottom:2px dotted #9a9a94;transform:translateY(-0.28em)} .ds-toc a:hover .t{text-decoration:underline;text-underline-offset:0.18em} .ds-toc a:focus-visible{outline:2px solid var(--link);outline-offset:3px}"
+    },
+    {
+      "name": "Thesis Page",
+      "kind": "card",
+      "refersTo": "page",
+      "description": "A paper page on cloth: numbered chapter opener (no running head), indented body, link and folio.",
+      "html": "<div class=\"ds-case\"><section class=\"ds-page\"><h2><span class=\"ds-ch\">1</span>Introduction</h2><p>Writing a thesis is mostly rereading it. The typeset page can be the place where that rereading happens.</p><p>A double-click on either side takes you to the <a href=\"#\">same spot</a> on the other.</p><span class=\"ds-folio\">1</span></section></div>",
+      "css": ":host{--cloth:#1e3b2c;--cloth-deep:#132a1e;--foil:#d8b765;--paper:#fdfdfb;--paper-edge:#e9e8e1;--label:#f7f6f0;--ink:#18181a;--ink-soft:#46464b;--rule:#cfcfc8;--link:#1d4a33;--hl-yellow:#ffd54a;--hl-green:#7bd88f;--hl-blue:#6cb6ff;--hl-pink:#ff8fc8;--serif:'Libertinus Serif','Times New Roman',serif;--sans:'Libertinus Sans','Segoe UI',sans-serif;} .ds-case{background:var(--cloth);padding:24px} .ds-page{position:relative;background:var(--paper);color:var(--ink);font-family:var(--serif);font-size:1.08rem;line-height:1.55;padding:3rem 2rem;border-bottom:1px solid var(--paper-edge);box-shadow:0 18px 30px -18px rgba(0,0,0,0.8)} .ds-page h2{margin:0 0 1.2rem;font-size:2rem;line-height:1.12;font-weight:700} .ds-ch{margin-right:0.75em} .ds-page p{margin:0;max-width:68ch;hyphens:auto} .ds-page p+p{text-indent:1.4em} .ds-page a{color:var(--link);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:0.18em} .ds-page a:hover{text-decoration-thickness:2px} .ds-page a:focus-visible{outline:2px solid var(--link);outline-offset:3px} .ds-folio{position:absolute;bottom:1rem;left:0;right:0;text-align:center;font-size:0.95rem;color:var(--ink-soft);font-variant-numeric:oldstyle-nums}"
+    },
+    {
+      "name": "Command Block",
+      "kind": "custom",
+      "refersTo": "command-block",
+      "description": "Ruled code block; each command a hanging-indent line.",
+      "html": "<pre class=\"ds-pre\"><span class=\"cmd\">typst compile --root . chapters/thesis-main-document.typ build/thesis-final-draft.pdf</span><span class=\"cmd\">typst watch thesis.typ</span></pre>",
+      "css": ":host{--cloth:#1e3b2c;--cloth-deep:#132a1e;--foil:#d8b765;--paper:#fdfdfb;--paper-edge:#e9e8e1;--label:#f7f6f0;--ink:#18181a;--ink-soft:#46464b;--rule:#cfcfc8;--link:#1d4a33;--hl-yellow:#ffd54a;--hl-green:#7bd88f;--hl-blue:#6cb6ff;--hl-pink:#ff8fc8;--serif:'Libertinus Serif','Times New Roman',serif;--sans:'Libertinus Sans','Segoe UI',sans-serif;} .ds-pre{margin:0;padding:0.9rem 1rem;background:#f4f4ef;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);white-space:pre-wrap;overflow-wrap:break-word;line-height:1.45;font-family:'Cascadia Code',Consolas,monospace;font-size:0.9rem;color:var(--ink)} .ds-pre .cmd{display:block;padding-left:2ch;text-indent:-2ch}"
+    },
+    {
+      "name": "Booktabs Table",
+      "kind": "custom",
+      "description": "Captioned table with top, bottom and header rules only; key caps inside.",
+      "html": "<table class=\"ds-table\"><caption><b>Table 2.1:</b> Keyboard shortcuts.</caption><thead><tr><th>Keys</th><th>Action</th></tr></thead><tbody><tr><td><kbd>Ctrl</kbd> <kbd>O</kbd></td><td>Open a file</td></tr><tr><td><kbd>Ctrl</kbd> <kbd>S</kbd></td><td>Save</td></tr></tbody></table>",
+      "css": ":host{--cloth:#1e3b2c;--cloth-deep:#132a1e;--foil:#d8b765;--paper:#fdfdfb;--paper-edge:#e9e8e1;--label:#f7f6f0;--ink:#18181a;--ink-soft:#46464b;--rule:#cfcfc8;--link:#1d4a33;--hl-yellow:#ffd54a;--hl-green:#7bd88f;--hl-blue:#6cb6ff;--hl-pink:#ff8fc8;--serif:'Libertinus Serif','Times New Roman',serif;--sans:'Libertinus Sans','Segoe UI',sans-serif;} .ds-table{border-collapse:collapse;width:100%;background:var(--paper);font-family:var(--serif);color:var(--ink);font-variant-numeric:lining-nums tabular-nums;border-top:2px solid var(--ink);border-bottom:2px solid var(--ink)} .ds-table caption{caption-side:top;text-align:left;padding-bottom:0.6rem;font-size:0.95rem} .ds-table th{text-align:left;font-weight:700;border-bottom:1px solid var(--ink);padding:0.4rem 0.6rem 0.35rem 0} .ds-table td{padding:0.32rem 0.6rem 0.32rem 0} .ds-table kbd{display:inline-block;padding:0.05em 0.4em;border:1px solid var(--rule);border-bottom-width:2px;border-radius:3px;background:#fafaf6;font-family:'Cascadia Code',Consolas,monospace;font-size:0.8em}"
+    },
+    {
+      "name": "Highlighter Swatches",
+      "kind": "chip",
+      "refersTo": "highlight-swatch",
+      "description": "The comment demo's four pigment toggles and mark button.",
+      "html": "<div class=\"ds-tools\"><button class=\"ds-swatch\" style=\"background:var(--hl-yellow)\" aria-pressed=\"true\" aria-label=\"Yellow\"></button><button class=\"ds-swatch\" style=\"background:var(--hl-green)\" aria-pressed=\"false\" aria-label=\"Green\"></button><button class=\"ds-swatch\" style=\"background:var(--hl-blue)\" aria-pressed=\"false\" aria-label=\"Blue\"></button><button class=\"ds-swatch\" style=\"background:var(--hl-pink)\" aria-pressed=\"false\" aria-label=\"Pink\"></button><button class=\"ds-mark\">Highlight selection</button></div>",
+      "css": ":host{--cloth:#1e3b2c;--cloth-deep:#132a1e;--foil:#d8b765;--paper:#fdfdfb;--paper-edge:#e9e8e1;--label:#f7f6f0;--ink:#18181a;--ink-soft:#46464b;--rule:#cfcfc8;--link:#1d4a33;--hl-yellow:#ffd54a;--hl-green:#7bd88f;--hl-blue:#6cb6ff;--hl-pink:#ff8fc8;--serif:'Libertinus Serif','Times New Roman',serif;--sans:'Libertinus Sans','Segoe UI',sans-serif;} .ds-tools{display:flex;align-items:center;gap:0.55rem;padding:0.5rem 0.65rem;border:1px solid var(--rule);background:#f6f6f1;font-family:var(--sans)} .ds-swatch{width:1.7rem;height:1.7rem;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px #9a9a94;cursor:pointer;padding:0} .ds-swatch[aria-pressed=true]{box-shadow:0 0 0 2px var(--ink)} .ds-swatch:focus-visible{outline:2px solid var(--link);outline-offset:3px} .ds-mark{margin-left:auto;font:700 0.85rem var(--sans);padding:0.4rem 0.7rem;border:1px solid #b5b5ae;border-radius:3px;background:#fff;color:var(--ink);cursor:pointer} .ds-mark:hover{background:#f0f0ea} .ds-mark:focus-visible{outline:2px solid var(--link);outline-offset:3px}"
+    },
+    {
+      "name": "Sticky Note",
+      "kind": "card",
+      "refersTo": "sticky-note",
+      "description": "A note pinned beside a highlighted passage, edged in its mark's colour.",
+      "html": "<div class=\"ds-wrap\"><p class=\"ds-text\">The page is where <mark>rereading happens</mark>.</p><div class=\"ds-note\"><textarea aria-label=\"Note\">Check this claim.</textarea><div class=\"ds-actions\"><button>Cancel</button><button class=\"primary\">Save</button></div></div></div>",
+      "css": ":host{--cloth:#1e3b2c;--cloth-deep:#132a1e;--foil:#d8b765;--paper:#fdfdfb;--paper-edge:#e9e8e1;--label:#f7f6f0;--ink:#18181a;--ink-soft:#46464b;--rule:#cfcfc8;--link:#1d4a33;--hl-yellow:#ffd54a;--hl-green:#7bd88f;--hl-blue:#6cb6ff;--hl-pink:#ff8fc8;--serif:'Libertinus Serif','Times New Roman',serif;--sans:'Libertinus Sans','Segoe UI',sans-serif;} .ds-wrap{background:#fff;padding:20px;font-family:var(--serif)} .ds-text{margin:0 0 12px;font-size:1.08rem;line-height:1.7;color:var(--ink)} .ds-text mark{color:inherit;background:color-mix(in srgb,var(--hl-yellow) 65%,transparent);padding:0.06em 0;border-radius:1px} .ds-note{max-width:13.5rem;font:0.86rem/1.4 var(--sans);color:#222;background:#fffdf3;border:1px solid rgba(0,0,0,0.14);border-top:4px solid var(--hl-yellow);border-radius:5px;padding:0.35rem 0.55rem 0.55rem;box-shadow:0 4px 14px rgba(0,0,0,0.18)} .ds-note textarea{width:100%;min-height:4.2rem;font:inherit;border:1px solid #c9c9c2;border-radius:3px;padding:0.3rem;box-sizing:border-box} .ds-note textarea:focus-visible{outline:2px solid var(--link);outline-offset:0} .ds-actions{display:flex;justify-content:flex-end;gap:0.3rem;margin-top:0.3rem} .ds-actions button{border:none;background:none;cursor:pointer;color:#555;font:inherit;padding:0.1rem 0.4rem;border-radius:3px} .ds-actions button:hover{background:rgba(0,0,0,0.07)} .ds-actions .primary{background:var(--link);color:#fff} .ds-actions .primary:hover{background:#163a28} .ds-actions button:focus-visible{outline:2px solid var(--link);outline-offset:2px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Bound Thesis",
+    "overview": "The site is one book handled once. It arrives closed: a green buckram case with woven grain, gold-foil lettering on the front board, a spine carrying gilt double rules and a pasted white library label that is the download button. Scrolling past the cover swings the board open on its spine, and everything below is the book's interior: bright white pages set in Libertinus Serif with the apparatus of a typeset thesis (title page, dot-leader contents, running heads, folios, numbered chapters, figures and tables, footnotes, references, colophon).\n\nDensity is that of a printed page, not a marketing layout. Pages sit in two-column spreads on the cloth, with a gutter shadow where they curve into the binding; one figure is a full-width fold-out plate. Persuasion comes from the typesetting itself being the proof: the page reads the way a Typst thesis would. Colour outside the cloth, foil and ink belongs to the product's comment feature, and only appears where that feature is demonstrated.",
+    "keyCharacteristics": [
+      "Two materials only: cloth (with foil) outside, paper (with ink) inside.",
+      "Flat gold foil, no emboss, no gradient lettering.",
+      "Book apparatus does the navigation: contents page, running heads, folios, numbered references.",
+      "Physical depth from soft paper shadows and inset cloth shading; never hard offsets.",
+      "One signature motion: the front board opens on its spine with scroll."
+    ],
+    "rules": [
+      {
+        "name": "The Two Materials Rule",
+        "body": "Cloth carries foil; paper carries ink. Foil never appears on paper and paper-toned text never appears on cloth except the spine label, which is itself a piece of paper pasted on.",
+        "section": "colors"
+      },
+      {
+        "name": "The Highlighter Rule",
+        "body": "The four highlighter pigments appear only where the comment feature is: its swatches, its marks and its sticky notes. They are not accents, not status colours and not decoration.",
+        "section": "colors"
+      },
+      {
+        "name": "The Real Small Caps Rule",
+        "body": "Labels are set with `font-variant-caps` (small caps or all small caps) plus modest tracking, never with uppercase text-transform; the face has true small caps and the thesis voice depends on them.",
+        "section": "typography"
+      },
+      {
+        "name": "The Thesis Numbering Rule",
+        "body": "Chapters, sections, figures, tables, footnotes and references are numbered and cross-referenced exactly as a typeset thesis would number them. Every number shown is real and links to its target.",
+        "section": "typography"
+      },
+      {
+        "name": "The Soft Paper Rule",
+        "body": "Shadows are soft and blurred, cast by paper on cloth or by a pasted object on paper. A paper object always pairs its shadow with a 1px paper-edge border.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Flat Foil Rule",
+        "body": "Foil lettering is a flat colour with no text-shadow, emboss, glow or gradient. Depth on the cover comes from the cloth and the stamped frame, not from the letters.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** set every word on cloth in flat foil (#d8b765), in small caps or the small-caps bold title style.",
+      "**Do** put new content on paper: a page in a spread, or a full-width plate, with the page-drop shadow and the 1px paper-edge border.",
+      "**Do** give pages the thesis apparatus: running head (except on chapter openers), folio, numbered headings, numbered and captioned figures and tables.",
+      "**Do** keep the download action as the pasted spine label wherever it appears.",
+      "**Do** honour reduced motion: the board does not swing and scrolling is not smooth.",
+      "**Do** write body text at 68ch or less, hyphenated, with indented paragraphs and no paragraph gaps."
+    ],
+    "donts": [
+      "**Don't** add text-shadow, emboss, glow or gradient to foil lettering.",
+      "**Don't** use hard, unblurred offset shadows anywhere.",
+      "**Don't** use the highlighter pigments outside the comment feature.",
+      "**Don't** introduce a second display face or set labels in uppercase; use Libertinus small caps.",
+      "**Don't** round the book's own surfaces (cloth, pages, plates, tables, code blocks).",
+      "**Don't** add a running head to a chapter-opening page.",
+      "**Don't** apply anything in this file to the desktop app in `src/`."
+    ]
+  }
+}
