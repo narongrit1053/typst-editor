@@ -422,7 +422,7 @@
     "rules": [
       {
         "name": "The Two Materials Rule",
-        "body": "Cloth carries foil; paper carries ink. Foil never appears on paper and paper-toned text never appears on cloth except the spine label, which is itself a piece of paper pasted on.",
+        "body": "Cloth carries foil; paper carries ink. Foil never appears on paper and paper-toned text never appears on cloth except the spine label, which is itself a piece of paper pasted on. Two binding details are the only exceptions: the gilt top edge of the page block (a 2px foil edge, never foil inside a page) and the bound-in silk, a deep-red ribbon bookmark and a striped headband at the head of the spine.",
         "section": "colors"
       },
       {

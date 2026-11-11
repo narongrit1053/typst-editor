@@ -107,6 +107,13 @@ body {
 .band:nth-child(2) { top: 12%; }
 .band:nth-child(3) { top: 56%; }
 .band:nth-child(4) { top: 61%; }
+/* Headband: striped thread at the head of the spine. */
+.headband {
+  position: absolute; top: 0; left: 8%; right: 8%; height: 7px;
+  background: repeating-linear-gradient(90deg, #8a2f2a 0 3px, #f3efe2 3px 6px);
+  border-radius: 0 0 3px 3px;
+  box-shadow: 0 2px 3px rgba(0,0,0,0.45);
+}
 .spine-title {
   position: absolute; left: 50%; top: 16%; height: 38%;
   translate: -50% 0;
@@ -198,6 +205,42 @@ body {
 }
 .open-link:hover { color: #f0d690; }
 
+/* ---------- Ribbon bookmark: from the cover to Figure 3.1 ---------- */
+
+.ribbon, .ribbon-marker {
+  position: absolute;
+  background: linear-gradient(90deg, #6c221e, #93342d 45%, #77281f);
+  /* Forked tail. */
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - 16px), 0 100%);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+.ribbon {
+  top: 0; bottom: 22%;
+  left: clamp(22px, 3vw, 52px);
+  width: 34px;
+  display: flex; justify-content: center;
+  padding-top: 2.2rem;
+  color: #f5e9d6;
+  text-decoration: none;
+  z-index: 2;
+  transition: bottom 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.ribbon span {
+  writing-mode: vertical-rl;
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.14em;
+  font-size: 1rem;
+  white-space: nowrap;
+}
+.ribbon:hover { bottom: 19%; }
+.ribbon:focus-visible { outline-offset: 4px; }
+/* The same ribbon lying in the outer margin of the page it marks, hanging below its foot. */
+.ribbon-marker {
+  top: -2px; right: clamp(10px, 1.6vw, 24px);
+  width: 20px; height: calc(100% + 30px);
+  z-index: 2;
+}
+
 /* ---------- Spine label: the primary action ---------- */
 
 .label {
@@ -249,6 +292,7 @@ body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   background: var(--paper);
+  border-top: 2px solid var(--foil); /* gilt top edge */
   border-bottom: 1px solid var(--paper-edge);
   box-shadow: 0 18px 30px -18px rgba(0,0,0,0.8);
 }
@@ -421,6 +465,7 @@ tbody tr:first-child td { padding-top: 0.5rem; }
   margin: 0 auto;
   padding: clamp(0.8rem, 2.5vw, 2rem) clamp(0.8rem, 2.5vw, 2rem) clamp(0.9rem, 2vw, 1.5rem);
   background: var(--paper);
+  border-top: 2px solid var(--foil); /* gilt top edge */
   border-bottom: 1px solid var(--paper-edge);
   box-shadow: 0 18px 30px -18px rgba(0,0,0,0.8);
 }
@@ -582,6 +627,8 @@ figcaption { margin-top: 0.8rem; font-size: 0.95rem; line-height: 1.45; max-widt
   .demo-sheet { min-height: 0; padding-bottom: 1rem; }
   .demo-notes { position: static; width: auto; height: auto; display: grid; gap: 0.6rem; margin-top: 1rem; }
   .note { position: static; }
+  .ribbon { display: none; }
+  .ribbon-marker { width: 10px; right: 4px; height: calc(100% + 20px); }
   .page .demo-text { max-width: none; }
 }
 

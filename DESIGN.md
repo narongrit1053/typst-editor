@@ -165,7 +165,7 @@ A two-material palette: deep bottle-green cloth with dull gold on the outside, n
 - **Hairline Rule** (rule): running-head underline, footnote separator, code-block rules, figure borders, demo frame.
 
 ### Named Rules
-**The Two Materials Rule.** Cloth carries foil; paper carries ink. Foil never appears on paper and paper-toned text never appears on cloth except the spine label, which is itself a piece of paper pasted on.
+**The Two Materials Rule.** Cloth carries foil; paper carries ink. Foil never appears on paper and paper-toned text never appears on cloth except the spine label, which is itself a piece of paper pasted on. Two binding details are the only exceptions: the gilt top edge of the page block (a 2px foil edge, never foil inside a page) and the bound-in silk, a deep-red ribbon bookmark and a striped headband at the head of the spine.
 
 **The Highlighter Rule.** The four highlighter pigments appear only where the comment feature is: its swatches, its marks and its sticky notes. They are not accents, not status colours and not decoration.
 
@@ -241,6 +241,9 @@ Library green with a 1px underline offset 0.18em; hover thickens the underline t
 
 ### Command Block
 Code set in Cascadia Code on a faint warm wash between two hairline rules, no box. Each command is its own line with a 2ch hanging indent, so a wrapped command never reads as a second command.
+
+### Ribbon Bookmark
+A deep-red silk ribbon (#6c221e to #93342d, forked tail, soft shadow) lies across the front board beside the spine and swings with it. It is a link to Figure 3.1 with its label set vertically in cream all-small-caps ("Try the highlighter · p. 4"), and it lengthens slightly on hover. The same ribbon lies in the outer margin of page 4 and hangs below its foot, so the page it marks is visible while reading. On phones the cover ribbon is hidden and the page ribbon narrows to fit the margin. One ribbon per book; it only ever marks the signature demo.
 
 ### Booktabs Table
 Full-width, caption above, 2px ink rules top and bottom, 1px rule under the header, tabular lining numerals, no fills or vertical rules. Keyboard shortcuts inside use small key caps with a thicker bottom border.
