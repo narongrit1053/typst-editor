@@ -258,7 +258,7 @@ Figure 3.1: a framed live paragraph the visitor drag-highlights. A toolbar strip
 - **Do** put new content on paper: a page in a spread, or a full-width plate, with the page-drop shadow and the 1px paper-edge border.
 - **Do** give pages the thesis apparatus: running head (except on chapter openers), folio, numbered headings, numbered and captioned figures and tables.
 - **Do** keep the download action as the pasted spine label wherever it appears.
-- **Do** honour reduced motion: the board does not swing and scrolling is not smooth.
+- **Do** honour reduced motion for smooth scrolling. The board swing is the one exception: by the owner's choice it plays for everyone on desktop (above 720px).
 - **Do** write body text at 68ch or less, hyphenated, with indented paragraphs and no paragraph gaps.
 
 ### Don't:

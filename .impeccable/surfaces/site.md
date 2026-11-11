@@ -16,6 +16,6 @@ FIRST VIEWPORT: The closed book fills the viewport: the spine on the left carrie
 
 FORM: Bound thesis, candidate 3 of 7. seed: none (roll skipped). The impeccable launcher (and its concept-seed roll) was not run; the lead "Conference poster" was dealt by a local random roll from the top three candidates, and the user then chose Bound thesis over it. Disclosed to the user.
 
-Signature interaction: Figure 3.1 is a live typeset paragraph that visitors drag-highlight in one of four colors and pin a sticky note to. Motion: the front board swings open on the spine as the visitor scrolls past the cover (reduced motion: no swing).
+Signature interaction: Figure 3.1 is a live typeset paragraph that visitors drag-highlight in one of four colors and pin a sticky note to. Motion: the front board swings open on the spine as the visitor scrolls past the cover (plays on desktop even under reduced motion, by the user's choice; off at 720px and below).
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance

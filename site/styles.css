@@ -542,7 +542,8 @@ figcaption { margin-top: 0.8rem; font-size: 0.95rem; line-height: 1.45; max-widt
 /* ---------- The board swings open on the spine as you scroll away ---------- */
 
 @supports (animation-timeline: scroll()) {
-  @media (prefers-reduced-motion: no-preference) and (min-width: 721px) {
+  /* Plays even with reduced motion: the owner chose to show the swing to everyone on desktop. */
+  @media (min-width: 721px) {
     .board {
       animation: board-open linear both;
       animation-timeline: scroll(root block);

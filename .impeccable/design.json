@@ -325,7 +325,7 @@
       {
         "name": "board-open",
         "value": "scroll-linked rotateY(0 to -72deg) with brightness(0.55), over 0 to 80vh of root scroll, transform-origin left center",
-        "purpose": "The front board swings open on its spine as the cover scrolls away. Only with animation-timeline support, above 720px, and without reduced motion."
+        "purpose": "The front board swings open on its spine as the cover scrolls away. Only with animation-timeline support and above 720px; by the owner's choice it also plays under reduced motion."
       },
       {
         "name": "reduced-motion",
@@ -456,7 +456,7 @@
       "**Do** put new content on paper: a page in a spread, or a full-width plate, with the page-drop shadow and the 1px paper-edge border.",
       "**Do** give pages the thesis apparatus: running head (except on chapter openers), folio, numbered headings, numbered and captioned figures and tables.",
       "**Do** keep the download action as the pasted spine label wherever it appears.",
-      "**Do** honour reduced motion: the board does not swing and scrolling is not smooth.",
+      "**Do** honour reduced motion for smooth scrolling. The board swing is the one exception: by the owner's choice it plays for everyone on desktop (above 720px).",
       "**Do** write body text at 68ch or less, hyphenated, with indented paragraphs and no paragraph gaps."
     ],
     "donts": [
