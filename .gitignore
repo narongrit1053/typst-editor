@@ -6,3 +6,9 @@ spike/
 .superpowers/
 .tauri/
 *.key
+
+# impeccable runtime files (questions, mocks, review captures)
+.impeccable/questions/
+.impeccable/mocks/
+.impeccable/review/
+.impeccable/config.local.json

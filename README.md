@@ -2,7 +2,15 @@
 
 A desktop editor for [Typst](https://typst.app) documents on Windows, with a live preview, two-way jumps between the source and the output, and comments you can pin right on the preview.
 
+**[Website](https://narongrit1053.github.io/typst-editor/)** · **[Download for Windows](https://github.com/narongrit1053/typst-editor/releases/latest)**
+
 ![Typst-Editor by Kong: source on the left, live preview with a highlight and a sticky note on the right](docs/screenshot.png)
+
+## Install
+
+Download the installer from the [latest release](https://github.com/narongrit1053/typst-editor/releases/latest) (Windows 10/11, 64-bit). The installer is not code-signed, so Windows SmartScreen may warn; choose *More info*, then *Run anyway*.
+
+Exporting uses the Typst command-line tool, so install it too: `winget install Typst.Typst`. LaTeX export also needs [Pandoc](https://pandoc.org).
 
 ## Features
 

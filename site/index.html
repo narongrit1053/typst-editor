@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Typst-Editor by Kong — a desktop editor for writing theses in Typst</title>
+<meta name="description" content="A Windows desktop editor for Typst: live preview, double-click jumps between source and page, and highlights with sticky notes pinned to the typeset page. Free and MIT licensed.">
+<meta property="og:title" content="Typst-Editor by Kong">
+<meta property="og:description" content="A desktop editor for writing theses in Typst, with live preview, two-way jumps and comments pinned to the typeset page.">
+<meta property="og:image" content="https://narongrit1053.github.io/typst-editor/img/editor.png">
+<meta name="theme-color" content="#1e3b2c">
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="fonts/LibertinusSerif-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip" href="#contents">Skip to contents</a>
+
+<svg class="defs" aria-hidden="true" focusable="false">
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 19h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-github" viewBox="0 0 16 16"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></symbol>
+  <!-- Marbled endpaper: stripes combed by turbulence. -->
+  <filter id="marble" x="0" y="0" width="100%" height="100%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.006 0.018" numOctaves="3" seed="11" result="t"/>
+    <feDisplacementMap in="SourceGraphic" in2="t" scale="140" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+  <pattern id="marble-stripes" width="120" height="40" patternUnits="userSpaceOnUse">
+    <rect width="120" height="40" fill="#1b3527"/>
+    <rect x="0" width="26" height="40" fill="#c9a24e"/>
+    <rect x="30" width="14" height="40" fill="#f3efe2"/>
+    <rect x="48" width="34" height="40" fill="#2f5a43"/>
+    <rect x="86" width="8" height="40" fill="#8a2f2a"/>
+    <rect x="98" width="18" height="40" fill="#e1c87e"/>
+  </pattern>
+</svg>
+
+<header class="book" id="top">
+  <div class="spine" aria-hidden="true">
+    <span class="band"></span><span class="band"></span><span class="band"></span><span class="band"></span>
+    <span class="spine-title">Typst-Editor · Kong · 0.1.0</span>
+  </div>
+  <div class="endpaper" aria-hidden="true">
+    <svg preserveAspectRatio="none"><rect width="140%" height="140%" x="-20%" y="-20%" fill="url(#marble-stripes)" filter="url(#marble)"/></svg>
+  </div>
+  <div class="board">
+    <div class="foil-frame">
+      <h1 class="foil">Typst-Editor</h1>
+      <p class="foil subtitle">A desktop editor for writing theses in Typst</p>
+      <p class="foil points"><span class="nb">live preview <span aria-hidden="true">·</span></span> <span class="nb">two-way jump <span aria-hidden="true">·</span></span> <span class="nb">comments on the page</span></p>
+      <p class="foil byline">by Kong</p>
+      <a class="foil open-link" href="#contents">Open the book</a>
+    </div>
+  </div>
+  <a class="label" href="https://github.com/narongrit1053/typst-editor/releases/latest/download/Typst-Editor-by-Kong_x64-setup.exe">
+    <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>
+    <span class="label-main">Download for Windows</span>
+    <span class="label-sub">v0.1.0 · 64-bit installer</span>
+  </a>
+</header>
+
+<main class="case">
+
+  <!-- Front matter -->
+  <div class="spread">
+    <section class="page title-page" aria-labelledby="t-title">
+      <p class="t-title" id="t-title">Typst-Editor</p>
+      <p class="t-sub">A desktop editor for writing theses in Typst, with live preview, two-way jumps between source and page, and comments pinned to the typeset page</p>
+      <p class="t-by">by</p>
+      <p class="t-author">Kong</p>
+      <p class="t-meta">Version 0.1.0 · Windows 10 and 11, 64-bit · MIT License</p>
+      <p class="t-date">November 2026</p>
+      <span class="folio">i</span>
+    </section>
+
+    <nav class="page" id="contents" aria-labelledby="contents-h">
+      <p class="runhead">Contents</p>
+      <h2 id="contents-h">Contents</h2>
+      <ol class="toc">
+        <li><a href="#ch1"><span class="n">1</span><span class="t">Introduction</span><span class="p">1</span></a></li>
+        <li><a href="#ch2"><span class="n">2</span><span class="t">Live preview and two-way jump</span><span class="p">2</span></a></li>
+        <li><a href="#ch3"><span class="n">3</span><span class="t">Comments on the page</span><span class="p">3</span></a></li>
+        <li><a href="#ch4"><span class="n">4</span><span class="t">Export</span><span class="p">5</span></a></li>
+        <li><a href="#ch5"><span class="n">5</span><span class="t">Installation</span><span class="p">6</span></a></li>
+        <li class="unnumbered"><a href="#refs"><span class="n"></span><span class="t">References</span><span class="p">7</span></a></li>
+        <li class="unnumbered"><a href="#colophon"><span class="n"></span><span class="t">Colophon</span><span class="p">8</span></a></li>
+      </ol>
+      <h3 class="lof-h">List of Figures</h3>
+      <ol class="toc lof">
+        <li><a href="#fig1-1"><span class="n">1.1</span><span class="t">The editor at work</span><span class="p">1</span></a></li>
+        <li><a href="#fig3-1"><span class="n">3.1</span><span class="t">Try the highlighter</span><span class="p">4</span></a></li>
+      </ol>
+      <h3 class="lof-h">List of Tables</h3>
+      <ol class="toc lof">
+        <li><a href="#tab2-1"><span class="n">2.1</span><span class="t">Keyboard shortcuts</span><span class="p">2</span></a></li>
+        <li><a href="#tab4-1"><span class="n">4.1</span><span class="t">Export formats</span><span class="p">5</span></a></li>
+      </ol>
+      <span class="folio">ii</span>
+    </nav>
+  </div>
+
+  <!-- Fold-out plate -->
+  <figure class="plate" id="fig1-1">
+    <img src="img/editor.png" width="1920" height="1080" alt="Typst-Editor with a demo document: Typst source on the left with two highlighted phrases, the typeset preview on the right with the same phrases highlighted in yellow and pink and a sticky note beside each, and a Comments list in the sidebar." decoding="async">
+    <figcaption><span class="fig-n">Figure 1.1:</span> The editor at work. Source on the left, the live typeset page on the right, with two highlighted passages and their sticky notes; the sidebar lists files, outline and comments. Screenshot of version 0.1.0 with a demo document.</figcaption>
+  </figure>
+
+  <div class="spread">
+    <section class="page" id="ch1" aria-labelledby="ch1-h">
+      <p class="runhead">Introduction</p>
+      <h2 id="ch1-h"><span class="ch-n">1</span>Introduction</h2>
+      <p>Writing a thesis is mostly rereading it. Typst<sup class="fn-ref"><a href="#fn1" id="fnr1">1</a></sup> compiles fast enough that the typeset page can be the place where that rereading happens, instead of a PDF you open, mark up somewhere else and close again.</p>
+      <p>Typst-Editor puts your source and the typeset page side by side on a Windows desktop. The page follows every keystroke. A double-click on either side takes you to the same spot on the other, and when you read something that needs another look, you highlight it on the page and pin a note to it.</p>
+      <p>Everything stays in your project folder: the <code>.typ</code> files you write, the images they include, and a small comments file beside each document.</p>
+      <h3><span class="sec-n">1.1</span>Around the page</h3>
+      <dl class="features">
+        <dt>Editor</dt><dd>Syntax highlighting, autocomplete, go to definition and formatting, from the Tinymist language server<sup class="fn-ref"><a href="#ref2">[2]</a></sup>.</dd>
+        <dt>Workspace</dt><dd>A file tree you can fold, an outline of your headings, a problems panel, quick open, a pinned main file and an image viewer.</dd>
+        <dt>Templates</dt><dd>Start from the Typst Universe catalog, or save your own documents as templates.</dd>
+      </dl>
+      <aside class="footnotes" aria-label="Footnotes">
+        <p id="fn1"><a href="#fnr1"><sup>1</sup></a> Typst is a markup-based typesetting system; see <a href="#ref1">[1]</a>. This editor bundles Typst 0.15.1 through Tinymist v0.15.12.</p>
+      </aside>
+      <span class="folio">1</span>
+    </section>
+
+    <section class="page" id="ch2" aria-labelledby="ch2-h">
+      <p class="runhead">Live preview and two-way jump</p>
+      <h2 id="ch2-h"><span class="ch-n">2</span>Live preview and two-way jump</h2>
+      <p>The right half of the window is the typeset page, rendered by Tinymist as you type. Zoom it with the toolbar, with Ctrl and the scroll wheel, or with Ctrl&nbsp;+&nbsp;= and Ctrl&nbsp;+&nbsp;−.</p>
+      <p>Double-click a word in the source and the page scrolls to where it was set; double-click a word on the page and the cursor lands on its source. The place you arrive at flashes orange for two seconds, so your eye finds it without searching.</p>
+      <table id="tab2-1">
+        <caption><span class="fig-n">Table 2.1:</span> Keyboard shortcuts.</caption>
+        <thead><tr><th scope="col">Keys</th><th scope="col">Action</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>Ctrl</kbd>&thinsp;<kbd>O</kbd></td><td>Open a file</td></tr>
+          <tr><td><kbd>Ctrl</kbd>&thinsp;<kbd>P</kbd></td><td>Quick open</td></tr>
+          <tr><td><kbd>Ctrl</kbd>&thinsp;<kbd>S</kbd></td><td>Save</td></tr>
+          <tr><td><kbd>Ctrl</kbd>&thinsp;<kbd>E</kbd></td><td>Export PDF</td></tr>
+          <tr><td><kbd>Ctrl</kbd>&thinsp;<kbd>B</kbd></td><td>Show or hide the sidebar</td></tr>
+          <tr><td><kbd>Shift</kbd>&thinsp;<kbd>Alt</kbd>&thinsp;<kbd>F</kbd></td><td>Format the document</td></tr>
+          <tr><td><kbd>F12</kbd></td><td>Go to definition</td></tr>
+          <tr><td><kbd>Ctrl</kbd>&thinsp;<kbd>0</kbd></td><td>Reset the preview zoom</td></tr>
+        </tbody>
+      </table>
+      <span class="folio">2</span>
+    </section>
+  </div>
+
+  <div class="spread">
+    <section class="page" id="ch3" aria-labelledby="ch3-h">
+      <p class="runhead">Comments on the page</p>
+      <h2 id="ch3-h"><span class="ch-n">3</span>Comments on the page</h2>
+      <p>Turn on <span class="smallcaps">Comment</span> in the toolbar and a small palette appears over the page: yellow, green, blue and pink. Pick one, drag across words on the typeset page, and write a note. The note sits beside the page like a sticky note, and the same words are highlighted in the source, in the same colour.</p>
+      <p>Drag a note by its header to anywhere on its page; a dashed line keeps it tied to its text. Collapse a note to a small tab when it is in the way, or click it to jump to its source.</p>
+      <h3><span class="sec-n">3.1</span>Where comments live</h3>
+      <p>Comments are saved next to the document, as <code>main.typ.comments.json</code> beside <code>main.typ</code>. They follow their words while you edit. If you delete the words a comment was on, the comment is kept and marked as detached until you remove it yourself.</p>
+      <span class="folio">3</span>
+    </section>
+
+    <section class="page" aria-labelledby="fig3-1-cap">
+      <p class="runhead">Comments on the page</p>
+      <figure class="demo" id="fig3-1">
+        <div class="demo-tools" role="toolbar" aria-label="Highlighter colour">
+          <button type="button" class="swatch" data-color="yellow" aria-pressed="true" aria-label="Yellow"></button>
+          <button type="button" class="swatch" data-color="green" aria-pressed="false" aria-label="Green"></button>
+          <button type="button" class="swatch" data-color="blue" aria-pressed="false" aria-label="Blue"></button>
+          <button type="button" class="swatch" data-color="pink" aria-pressed="false" aria-label="Pink"></button>
+          <button type="button" class="demo-mark" id="demo-mark">Highlight selection</button>
+        </div>
+        <div class="demo-sheet">
+          <p class="demo-text" id="demo-text">Soil samples were taken at four depths along each transect, and the moisture readings fell steadily from the river bank to the ridge. We attribute the sharper drop on the eastern slope to its thinner organic layer, which holds less water after rain and dries faster in the afternoon sun.</p>
+          <div class="demo-notes" id="demo-notes" aria-live="polite"></div>
+        </div>
+        <figcaption id="fig3-1-cap"><span class="fig-n">Figure 3.1:</span> Try the highlighter: drag across any words in the paragraph above (or select them with the keyboard and press <em>Highlight selection</em>), then write a note. Sample text; nothing here is saved.</figcaption>
+      </figure>
+      <span class="folio">4</span>
+    </section>
+  </div>
+
+  <div class="spread">
+    <section class="page" id="ch4" aria-labelledby="ch4-h">
+      <p class="runhead">Export</p>
+      <h2 id="ch4-h"><span class="ch-n">4</span>Export</h2>
+      <p>When a chapter is ready to send, export it from the toolbar. Exports use the Typst command-line tool, so it needs to be installed (Chapter&nbsp;<a href="#ch5">5</a>).</p>
+      <table id="tab4-1">
+        <caption><span class="fig-n">Table 4.1:</span> Export formats.</caption>
+        <thead><tr><th scope="col">Format</th><th scope="col">What you get</th></tr></thead>
+        <tbody>
+          <tr><td>PDF</td><td>The document, ready to print or submit.</td></tr>
+          <tr><td>PNG</td><td>One image per page.</td></tr>
+          <tr><td>SVG</td><td>One vector image per page.</td></tr>
+          <tr><td>HTML</td><td>A standalone web page copied from the live preview, with selectable text and working links.</td></tr>
+          <tr><td>LaTeX</td><td>A <code>.tex</code> file with its images beside it. Needs Pandoc<sup class="fn-ref"><a href="#ref3">[3]</a></sup>.</td></tr>
+        </tbody>
+      </table>
+      <span class="folio">5</span>
+    </section>
+
+    <section class="page" id="ch5" aria-labelledby="ch5-h">
+      <p class="runhead">Installation</p>
+      <h2 id="ch5-h"><span class="ch-n">5</span>Installation</h2>
+      <h3><span class="sec-n">5.1</span>Download</h3>
+      <p>Typst-Editor runs on Windows 10 and 11, 64-bit.</p>
+      <a class="label label-inline" href="https://github.com/narongrit1053/typst-editor/releases/latest/download/Typst-Editor-by-Kong_x64-setup.exe">
+        <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>
+        <span class="label-main">Download for Windows</span>
+        <span class="label-sub">v0.1.0 · 64-bit installer</span>
+      </a>
+      <p>The installer is not code-signed, so Windows SmartScreen may say <q>Windows protected your PC</q>. Choose <em>More info</em>, then <em>Run anyway</em>. Every release is listed on <a href="https://github.com/narongrit1053/typst-editor/releases">the releases page</a>.</p>
+      <p>For exporting, also install the Typst command-line tool:</p>
+      <pre><code><span class="cmd">winget install Typst.Typst</span></code></pre>
+      <h3><span class="sec-n">5.2</span>Build from source</h3>
+      <p>You need Node.js, Rust and the Tauri prerequisites<sup class="fn-ref"><a href="#ref4">[4]</a></sup>. Put Tinymist v0.15.12 as <code>tools/tinymist.exe</code>, then:</p>
+      <pre><code><span class="cmd">git clone https://github.com/<wbr>narongrit1053/<wbr>typst-editor</span><span class="cmd">cd typst-editor</span><span class="cmd">npm install</span><span class="cmd">npm run tauri dev</span></code></pre>
+      <span class="folio">6</span>
+    </section>
+  </div>
+
+  <div class="spread">
+    <section class="page" id="refs" aria-labelledby="refs-h">
+      <p class="runhead">References</p>
+      <h2 id="refs-h">References</h2>
+      <ol class="refs">
+        <li id="ref1">Typst. <cite>Typst: a markup-based typesetting system.</cite> <a href="https://typst.app">typst.app</a></li>
+        <li id="ref2">Myriad-Dreamin. <cite>Tinymist: an integrated language service for Typst.</cite> <a href="https://github.com/Myriad-Dreamin/tinymist">github.com/Myriad-Dreamin/tinymist</a></li>
+        <li id="ref3">J. MacFarlane. <cite>Pandoc: a universal document converter.</cite> <a href="https://pandoc.org">pandoc.org</a></li>
+        <li id="ref4">Tauri. <cite>Prerequisites.</cite> <a href="https://tauri.app/start/prerequisites/">tauri.app/start/prerequisites</a></li>
+        <li id="ref5">CodeMirror. <cite>A code editor component for the web.</cite> <a href="https://codemirror.net">codemirror.net</a></li>
+        <li id="ref6">The Libertinus Project. <cite>Libertinus fonts.</cite> <a href="https://github.com/alerque/libertinus">github.com/alerque/libertinus</a></li>
+      </ol>
+      <span class="folio">7</span>
+    </section>
+
+    <section class="page" id="colophon" aria-labelledby="colophon-h">
+      <p class="runhead">Colophon</p>
+      <h2 id="colophon-h">Colophon</h2>
+      <p>This page is set in Libertinus Serif, the typeface Typst uses by default, so the text here looks the way your own documents will in the preview.</p>
+      <p>Typst-Editor is free software under the <a href="https://github.com/narongrit1053/typst-editor/blob/master/LICENSE">MIT License</a>, © 2026 Kong. It bundles Tinymist (Apache-2.0) and the TeX Gyre Termes fonts (GUST Font License).</p>
+      <p>The source, issues and releases are on <a href="https://github.com/narongrit1053/typst-editor">GitHub</a>.</p>
+      <span class="folio">8</span>
+    </section>
+  </div>
+</main>
+
+<footer class="back">
+  <p class="foil back-title">Typst-Editor</p>
+  <a class="label" href="https://github.com/narongrit1053/typst-editor/releases/latest/download/Typst-Editor-by-Kong_x64-setup.exe">
+    <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>
+    <span class="label-main">Download for Windows</span>
+    <span class="label-sub">v0.1.0 · 64-bit installer</span>
+  </a>
+  <a class="foil gh-link" href="https://github.com/narongrit1053/typst-editor">
+    <svg class="icon" aria-hidden="true"><use href="#i-github"/></svg>
+    Source on GitHub
+  </a>
+</footer>
+
+<script src="demo.js" defer></script>
+</body>
+</html>
