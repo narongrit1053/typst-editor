@@ -10,8 +10,10 @@ import {
   crosshairCursor,
   Decoration,
   DecorationSet,
+  gutter,
+  GutterMarker,
 } from "@codemirror/view";
-import { EditorState, Compartment, StateEffect, StateField } from "@codemirror/state";
+import { EditorState, Compartment, StateEffect, StateField, RangeSet } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { autocompletion, completionKeymap, closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
@@ -28,6 +30,7 @@ import {
 } from "@codemirror/lsp-client";
 
 import { LspConnection, pathToUri, uriToPath } from "./lsp";
+import type { CommentRange } from "./comments";
 
 export function fixRawTextWhitespace(text: string): string {
   return text.replace(/(^|[^`])```([^\s\n`][^`\n]*```)/g, "$1``` $2");
@@ -60,6 +63,45 @@ const flashField = StateField.define<DecorationSet>({
   provide: (f) => EditorView.decorations.from(f),
 });
 
+// Comment anchors: ranges that move with edits. A range whose text is deleted collapses and is
+// dropped here; the caller then lists that comment as detached (it is never lost).
+export const setComments = StateEffect.define<CommentRange[]>();
+export const commentField = StateField.define<CommentRange[]>({
+  create: () => [],
+  update(ranges, tr) {
+    for (const e of tr.effects) if (e.is(setComments)) return e.value;
+    if (!tr.docChanged) return ranges;
+    return ranges
+      .map((r) => ({ ...r, from: tr.changes.mapPos(r.from, 1), to: tr.changes.mapPos(r.to, -1) }))
+      .filter((r) => r.to > r.from);
+  },
+  provide: (f) =>
+    EditorView.decorations.from(f, (ranges) =>
+      Decoration.set(
+        ranges.map((r) => Decoration.mark({ class: `cm-comment-mark cm-comment-${r.color || "yellow"}` }).range(r.from, r.to)),
+        true,
+      ),
+    ),
+});
+
+class CommentDot extends GutterMarker {
+  toDOM() {
+    const el = document.createElement("span");
+    el.className = "cm-comment-dot";
+    el.textContent = "●";
+    return el;
+  }
+}
+const commentDot = new CommentDot();
+const commentGutter = gutter({
+  class: "cm-comment-gutter",
+  markers: (v) =>
+    RangeSet.of(
+      v.state.field(commentField).map((r) => commentDot.range(v.state.doc.lineAt(r.from).from)),
+      true,
+    ),
+});
+
 export interface Problem {
   path: string;
   line: number;
@@ -80,6 +122,8 @@ export interface EditorHandle {
   setWordWrap(enabled: boolean): void;
   setTheme(dark: boolean): void;
   onDiagnostics(cb: (d: Problem[]) => void): void;
+  setComments(ranges: CommentRange[]): void;
+  getCommentRanges(): CommentRange[];
   destroy(): void;
 }
 
@@ -177,6 +221,8 @@ export function createEditor(
       typst(),
       updateListener,
       flashField,
+      commentField,
+      commentGutter,
       EditorView.domEventHandlers({
         dblclick: (event, targetView) => {
           const pos = targetView.posAtCoords({ x: event.clientX, y: event.clientY });
@@ -317,6 +363,15 @@ export function createEditor(
 
     onDiagnostics(cb: (d: Problem[]) => void) {
       diagnosticsCallbacks.push(cb);
+    },
+
+    setComments(ranges: CommentRange[]) {
+      const len = view?.state.doc.length ?? 0;
+      view?.dispatch({ effects: setComments.of(ranges.filter((r) => r.from < r.to && r.to <= len)) });
+    },
+
+    getCommentRanges(): CommentRange[] {
+      return view ? view.state.field(commentField) : [];
     },
 
     destroy() {

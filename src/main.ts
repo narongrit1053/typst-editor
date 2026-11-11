@@ -27,6 +27,17 @@ import {
   checkForUpdates,
 } from "./settings";
 import { initTemplateMarket, openTemplateMarket } from "./templates";
+import {
+  DocComment,
+  anchorComments,
+  COMMENT_COLORS,
+  lineColOf,
+  parseSidecar,
+  renderComments,
+  serializeSidecar,
+  sidecarPath,
+  sourceRangeFor,
+} from "./comments";
 
 let lspConnection: LspConnection | null = null;
 let editor: EditorHandle | null = null;
@@ -42,6 +53,10 @@ let isReconnecting = false;
 let flatWorkspaceFiles: string[] = [];
 let lastSavedDiskContent: string | null = null;
 let appFontsDir: string | undefined;
+let comments: DocComment[] = [];
+// Sidecar to write comments to; null while it could not be read, so a damaged file is never overwritten.
+let commentsPath: string | null = null;
+let commentMode = false;
 
 export function getCurrentFilePath(): string | null {
   return currentFilePath;
@@ -274,9 +289,13 @@ async function deleteItem(path: string) {
 
   try {
     await invoke("delete_path", { path });
+    await invoke("delete_path", { path: sidecarPath(path) }).catch(() => {});
     const normPath = normalizePath(path);
     if (normalizePath(currentFilePath) === normPath) {
       currentFilePath = null;
+      commentsPath = null;
+      comments = [];
+      drawComments();
       updateFileNameDisplay(null, false);
       editor?.open("", "");
     }
@@ -300,9 +319,12 @@ async function renameItem(oldPath: string) {
 
   try {
     await invoke("rename_path", { oldPath, newPath });
+    // Comments follow the document (no sidecar is fine).
+    await invoke("rename_path", { oldPath: sidecarPath(oldPath), newPath: sidecarPath(newPath) }).catch(() => {});
     const oldNorm = normalizePath(oldPath);
     if (normalizePath(currentFilePath) === oldNorm) {
       currentFilePath = newPath;
+      if (commentsPath) commentsPath = sidecarPath(newPath);
       updateFileNameDisplay(newPath, saver?.isDirty() || false);
     }
     if (normalizePath(pinnedFilePath) === oldNorm) {
@@ -457,9 +479,197 @@ function onPreviewDoubleClick() {
   }
 }
 
+// ---- Comments on the preview (see src/comments.ts; drawn in the preview by src-tauri/src/preview_flash.js) ----
+
+let commentColor = "yellow";
+// A note just written in the preview, waiting for Tinymist to report its source start and end.
+let awaitingSrc: { data: any; points: any[]; timer: ReturnType<typeof setTimeout> } | null = null;
+
+function previewWindow() {
+  return (document.getElementById("preview") as HTMLIFrameElement | null)?.contentWindow;
+}
+
+// The preview draws highlights and sticky notes from this; sent whenever comments or the tool change.
+function pushPreviewComments() {
+  previewWindow()?.postMessage({ type: "kong-comments", comments, tool: { on: commentMode, color: commentColor } }, "*");
+}
+
+function selectComment(id: string) {
+  const r = editor?.getCommentRanges().find((x) => x.id === id);
+  if (!r || !editor) return;
+  const text = editor.getText();
+  const s = lineColOf(text, r.from);
+  const e = lineColOf(text, r.to);
+  editor.jumpToRange(s.line, s.col, e.line, e.col, true);
+  syncPreviewToEditor(s.line, s.col);
+}
+
+function editComment(id: string, body: string) {
+  const cm = comments.find((x) => x.id === id);
+  if (!cm || !body || body === cm.body) return;
+  cm.body = body;
+  saveComments().catch((err) => showBanner(`Could not save comment: ${err?.message || err}`));
+}
+
+async function removeComment(id: string) {
+  const cm = comments.find((x) => x.id === id);
+  if (!cm) return;
+  if (!(await ask(`Delete this comment?\n\n“${cm.body}”`, { title: "Delete Comment", kind: "warning" }))) return;
+  comments = comments.filter((x) => x.id !== id);
+  saveComments().catch((err) => showBanner(`Could not save comments: ${err?.message || err}`));
+}
+
+function drawComments() {
+  const el = document.getElementById("comments-list");
+  if (el) {
+    renderComments(el, comments, {
+      select: (cm) => selectComment(cm.id),
+      edit: (cm) => editComment(cm.id, window.prompt("Edit comment:", cm.body)?.trim() || ""),
+      remove: (cm) => removeComment(cm.id),
+    });
+  }
+  pushPreviewComments();
+}
+
+// A note was written on a preview selection: ask the preview for the selection's source points.
+function startCommentFromPreview(data: any) {
+  if (awaitingSrc) finishCommentFromPreview().catch(console.error);
+  awaitingSrc = { data, points: [], timer: setTimeout(() => finishCommentFromPreview().catch(console.error), 1500) };
+  previewWindow()?.postMessage({ type: "kong-src-request", anchor: data.preview }, "*");
+}
+
+async function finishCommentFromPreview() {
+  const pending = awaitingSrc;
+  if (!pending) return;
+  awaitingSrc = null;
+  clearTimeout(pending.timer);
+  const [p1, p2] = pending.points;
+  // The comment belongs to the file the selection came from (it may be an included file).
+  if (p1 && normalizePath(uriToPath(p1.uri)) !== normalizePath(currentFilePath)) await openFile(uriToPath(p1.uri));
+  if (!editor || !currentFilePath) return;
+  if (!commentsPath) {
+    showBanner("Comments are off for this file because its comments file could not be read.");
+    return;
+  }
+  syncCommentPositions();
+  const text = editor.getText();
+  const sameFile = (p: any) => p && normalizePath(uriToPath(p.uri)) === normalizePath(currentFilePath);
+  const range = sourceRangeFor(
+    text,
+    String(pending.data.preview?.text || ""),
+    sameFile(p1) ? p1.selection?.start : undefined,
+    sameFile(p2) ? p2.selection?.start : undefined,
+  );
+  const pos = range ? lineColOf(text, range.from) : { line: 0, col: 0 };
+  comments.push({
+    id: crypto.randomUUID(),
+    body: String(pending.data.body),
+    quote: range ? text.slice(range.from, range.to) : "",
+    ...pos,
+    created: new Date().toISOString(),
+    color: pending.data.color in COMMENT_COLORS ? pending.data.color : "yellow",
+    preview: pending.data.preview,
+  });
+  applyComments();
+  if (range) {
+    const e = lineColOf(text, range.to);
+    editor.jumpToRange(pos.line, pos.col, e.line, e.col, true);
+  }
+  await saveComments().catch((err) => showBanner(`Could not save comment: ${err?.message || err}`));
+}
+
+function onPreviewCommentMessage(data: any) {
+  switch (data.type) {
+    case "kong-preview-ready":
+      pushPreviewComments();
+      break;
+    case "kong-comment-create":
+      startCommentFromPreview(data);
+      break;
+    case "kong-src-none":
+      finishCommentFromPreview().catch(console.error);
+      break;
+    case "kong-comment-edit":
+      editComment(String(data.id), String(data.body || "").trim());
+      break;
+    case "kong-comment-delete":
+      removeComment(String(data.id)).catch(console.error);
+      break;
+    case "kong-comment-select":
+      selectComment(String(data.id));
+      break;
+    case "kong-comment-tool":
+      if (data.color in COMMENT_COLORS) commentColor = data.color;
+      break;
+  }
+}
+
+function applyComments() {
+  const r = anchorComments(editor?.getText() ?? "", comments);
+  comments = r.comments;
+  editor?.setComments(r.ranges);
+  drawComments();
+}
+
+// Copies each comment's live position (it moves as the text is edited) back into the list.
+function syncCommentPositions() {
+  if (!editor) return;
+  const text = editor.getText();
+  const ranges = new Map(editor.getCommentRanges().map((r) => [r.id, r]));
+  comments = comments.map((cm) => {
+    if (!cm.quote) return cm; // preview-only
+    const r = ranges.get(cm.id);
+    if (!r) return { ...cm, detached: true };
+    const { detached, ...rest } = cm;
+    return { ...rest, ...lineColOf(text, r.from), quote: text.slice(r.from, r.to) };
+  });
+}
+
+async function loadComments(docPath: string) {
+  comments = [];
+  commentsPath = null;
+  const path = sidecarPath(docPath);
+  let raw = "";
+  try {
+    raw = await invoke<string>("read_file", { path });
+  } catch (e: any) {
+    // "os error 2" = no sidecar yet. Anything else: leave comments off rather than risk overwriting it.
+    if (!String(e).includes("os error 2")) {
+      showBanner(`Could not read comments (${path}): ${e?.message || e}`);
+      drawComments();
+      return;
+    }
+  }
+  try {
+    comments = parseSidecar(raw);
+    commentsPath = path;
+  } catch {
+    showBanner(`The comments file is damaged and was left untouched: ${path}`);
+  }
+  applyComments();
+}
+
+async function saveComments() {
+  const path = commentsPath;
+  if (!path) return;
+  syncCommentPositions();
+  drawComments();
+  if (comments.length > 0) {
+    await invoke("write_file", { path, contents: serializeSidecar(comments) });
+  } else {
+    await invoke("delete_path", { path }).catch(() => {}); // fine if it never existed
+  }
+}
+
 function setupLspHandlers(lsp: LspConnection) {
   lsp.onNotification("window/showDocument", (params: any) => {
     if (!params || !params.uri) return;
+    // Source points asked for a new preview comment (start, then end); not a jump.
+    if (awaitingSrc) {
+      awaitingSrc.points.push(params);
+      if (awaitingSrc.points.length >= 2) finishCommentFromPreview().catch(console.error);
+      return;
+    }
     if (Date.now() - lastPreviewDblClick < PAIR_MS) {
       lastPreviewDblClick = 0;
       jumpFromPreview(params);
@@ -922,6 +1132,7 @@ export async function openFile(filePath?: string) {
         const normalized = withEol(text, currentEol);
         await invoke("write_file", { path: currentFilePath, contents: normalized });
         lastSavedDiskContent = normalized;
+        await saveComments(); // positions moved with the edits
       },
       onState: (state, err) => {
         if (state === "saved") {
@@ -946,6 +1157,7 @@ export async function openFile(filePath?: string) {
 
     editor?.open(targetPath, content);
     updateFileNameDisplay(targetPath, false);
+    await loadComments(targetPath);
 
     const previewFrame = document.getElementById("preview") as HTMLIFrameElement;
     const targetPreview = pinnedFilePath || targetPath;
@@ -973,7 +1185,9 @@ async function handleExternalFileChange() {
 
     if (saver && !saver.isDirty()) {
       lastSavedDiskContent = diskContent;
+      syncCommentPositions();
       editor.open(currentFilePath, diskContent);
+      applyComments();
       scheduleOutlineRefresh();
     } else if (saver && saver.isDirty()) {
       const reload = await ask(
@@ -982,7 +1196,9 @@ async function handleExternalFileChange() {
       );
       if (reload) {
         lastSavedDiskContent = diskContent;
+        syncCommentPositions();
         editor.open(currentFilePath, diskContent);
+        applyComments();
         saver.saveNow().catch(() => {});
         scheduleOutlineRefresh();
       }
@@ -1028,9 +1244,9 @@ function initApp() {
   let lastPreviewSyncTime = 0;
   let lastPreviewSyncLoc = "";
   window.addEventListener("message", (event) => {
-    if (event.origin.startsWith("http://127.0.0.1:") && event.data?.type === "kong-preview-dblclick") {
-      onPreviewDoubleClick();
-    }
+    if (!event.origin.startsWith("http://127.0.0.1:") || typeof event.data?.type !== "string") return;
+    if (event.data.type === "kong-preview-dblclick") onPreviewDoubleClick();
+    else onPreviewCommentMessage(event.data);
   });
 
   initPreviewSync((file, line, col) => {
@@ -1133,6 +1349,16 @@ function initApp() {
       await openFolder(targetDir);
     });
   });
+
+  // Comment mode: shows the highlight palette in the preview; selecting text there starts a note.
+  const btnCommentMode = document.getElementById("btn-comment-mode");
+  btnCommentMode?.addEventListener("click", () => {
+    commentMode = !commentMode;
+    btnCommentMode.classList.toggle("active", commentMode);
+    btnCommentMode.setAttribute("aria-pressed", String(commentMode));
+    pushPreviewComments();
+  });
+  drawComments();
 
   // Format button
   const btnFormat = document.getElementById("btn-format");

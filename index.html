@@ -27,6 +27,7 @@
         </div>
         <div class="toolbar-right">
           <button id="btn-format" class="btn" title="Format Document (Shift+Alt+F)">Format</button>
+          <button id="btn-comment-mode" class="btn" title="Comment mode: select text in the preview to highlight it and add a note" aria-pressed="false">💬 Comment</button>
           <div class="zoom-controls">
             <button id="btn-zoom-out" class="btn btn-sm" title="Zoom Out (Ctrl+-)">−</button>
             <button id="btn-zoom-reset" class="btn btn-sm" title="Reset Zoom (Ctrl+0)">100%</button>
@@ -64,6 +65,12 @@
               <span>Outline</span>
             </div>
             <div id="outline-tree" class="sidebar-tree"></div>
+          </div>
+          <div class="sidebar-section">
+            <div class="sidebar-header">
+              <span>Comments</span>
+            </div>
+            <div id="comments-list" class="sidebar-tree"></div>
           </div>
         </aside>
 

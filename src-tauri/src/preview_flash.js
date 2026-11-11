@@ -186,7 +186,469 @@ ${xml.serializeToString(resources)}
     timer = setTimeout(flushFlash, 150);
   }
 
+  // ---- Comments (src/comments.ts owns the data) ----
+  // The app sends the file's comments as "kong-comments"; we draw highlights and sticky notes in
+  // our own layer (Tinymist redraws its SVG on every edit) and report what the user does.
+  const commentCss = `
+    .kong-comments-layer { position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: 20; }
+    .kong-hl { position: absolute; pointer-events: none; mix-blend-mode: multiply; opacity: 0.5; border-radius: 2px; }
+    .kong-hl.moved { opacity: 0.25; outline: 1px dashed #777; }
+    .kong-note { position: absolute; width: 200px; box-sizing: border-box; padding: 4px 8px 8px; background: #fffdf3;
+      border: 1px solid rgba(0,0,0,.15); border-top: 5px solid var(--c); border-radius: 6px;
+      box-shadow: 0 4px 14px rgba(0,0,0,.2); font: 13px/1.4 system-ui, sans-serif; color: #222; }
+    .kong-note.moved { border-style: dashed; border-top-style: solid; }
+    .kong-note-head { display: flex; align-items: center; gap: 2px; margin: 0 -4px 2px; font-size: 11px; color: #a06000; }
+    .kong-note-head span { flex: 1; }
+    .kong-note-head button, .kong-note-actions button { border: none; background: none; cursor: pointer; color: #555; font: inherit; padding: 1px 5px; border-radius: 4px; }
+    .kong-note-head button:hover, .kong-note-actions button:hover { background: rgba(0,0,0,.08); }
+    .kong-note-actions .primary { background: #1f7a8c; color: #fff; }
+    .kong-note-body { white-space: pre-wrap; overflow-wrap: anywhere; cursor: pointer; max-height: 180px; overflow: auto; }
+    .kong-note textarea { width: 100%; box-sizing: border-box; min-height: 64px; font: inherit; resize: vertical; }
+    .kong-note-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px; }
+    .kong-note-tab { position: absolute; width: 24px; height: 24px; border: none; border-radius: 5px; background: var(--c);
+      cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,.25); font-size: 12px; padding: 0; }
+    .kong-palette { position: fixed; top: 10px; right: 16px; z-index: 30; display: flex; gap: 8px; align-items: center;
+      background: #fff; color: #333; border-radius: 8px; padding: 6px 10px; box-shadow: 0 3px 12px rgba(0,0,0,.25);
+      font: 12px system-ui, sans-serif; }
+    .kong-palette[hidden] { display: none; }
+    .kong-swatch { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #fff; outline: 1px solid #aaa; cursor: pointer; padding: 0; }
+    .kong-swatch.active { outline: 2px solid #222; }
+    .kong-tool-on #typst-container-main { cursor: text; }
+    .kong-tool-on .tsel::selection { background: transparent; }
+  `;
+  const COLORS = { yellow: "#ffd54a", green: "#7bd88f", blue: "#6cb6ff", pink: "#ff8fc8" };
+  let comments = [];
+  let tool = { on: false, color: "yellow" };
+  let draft = null; // { anchor, color, body }: a selection waiting for its note text
+  let editing = null; // { id, body }: a note being edited
+  const collapsed = new Set();
+  let layer = null;
+  let palette = null;
+  let redrawTimer = null;
+  const toApp = (msg) => parent.postMessage(msg, "*");
+  const scroller = () => document.getElementById("typst-container-main");
+  const pageBox = (n) => document.querySelector(`.typst-page-inner[data-page-number="${n}"]`)?.getBoundingClientRect();
+  const strip = (s) => s.replace(/\s+/g, "");
+  const el = (tag, cls, text) => {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  };
+
+  // A page's text without whitespace, plus where each character lives, so text can be matched
+  // however Tinymist splits it into lines.
+  function pageChars(n) {
+    const chars = [];
+    let text = "";
+    for (const div of document.querySelectorAll(`g.typst-page[data-page-number="${n}"] .tsel`)) {
+      const walker = document.createTreeWalker(div, NodeFilter.SHOW_TEXT);
+      for (let node; (node = walker.nextNode()); ) {
+        for (let i = 0; i < node.data.length; i++) {
+          if (/\s/.test(node.data[i])) continue;
+          text += node.data[i];
+          chars.push([node, i]);
+        }
+      }
+    }
+    return { text, chars };
+  }
+
+  // Range boxes for styled text include per-glyph boxes inside the line box; drop those so the
+  // highlight doesn't stack darker.
+  function outerRects(list) {
+    const rs = [...list].filter((r) => r.width > 0 && r.height > 0);
+    const inside = (a, b) => a !== b && a.left >= b.left - 0.5 && a.right <= b.right + 0.5 && a.top >= b.top - 0.5 && a.bottom <= b.bottom + 0.5;
+    return rs.filter((a, i) => !rs.some((b, j) => inside(a, b) && (!inside(b, a) || j < i)));
+  }
+
+  function nearest(hay, needle, near) {
+    let best = -1;
+    for (let i = hay.indexOf(needle); i >= 0; i = hay.indexOf(needle, i + 1)) {
+      if (best < 0 || Math.abs(i - near) < Math.abs(best - near)) best = i;
+    }
+    return best;
+  }
+
+  // The anchor's text found again in the current render: { page, rects } in client coords, or null.
+  function locate(a) {
+    const needle = strip(a.text || "");
+    if (!needle) return null;
+    const pages = a.page != null ? [a.page] : [...document.querySelectorAll("g.typst-page")].map((g) => g.getAttribute("data-page-number"));
+    for (const n of pages) {
+      const { text, chars } = pageChars(n);
+      const i = nearest(text, needle, a.index || 0);
+      if (i < 0) continue;
+      const last = chars[i + needle.length - 1];
+      const r = document.createRange();
+      r.setStart(chars[i][0], chars[i][1]);
+      r.setEnd(last[0], last[1] + 1);
+      const rects = outerRects(r.getClientRects());
+      if (rects.length) return { page: Number(n), rects };
+    }
+    return null;
+  }
+
+  // Where the anchor was when saved (its text is gone or changed).
+  function savedRects(a) {
+    const p = a.page != null && pageBox(a.page);
+    if (!p || !a.rects) return [];
+    return a.rects.map(([x, y, w, h]) => new DOMRect(p.left + x * p.width, p.top + y * p.height, w * p.width, h * p.height));
+  }
+
+  function scheduleRedraw() {
+    clearTimeout(redrawTimer);
+    redrawTimer = setTimeout(redraw, 80);
+  }
+
+  function noteCard(it, color) {
+    const c = it.c;
+    const card = el("div", it.found ? "kong-note" : "kong-note moved");
+    card.style.setProperty("--c", color);
+    const head = el("div", "kong-note-head");
+    head.append(el("span", null, it.found ? "" : "text changed"));
+    const btn = (label, title, fn) => {
+      const b = el("button", null, label);
+      b.type = "button";
+      b.title = title;
+      b.setAttribute("aria-label", title);
+      b.addEventListener("click", fn);
+      return b;
+    };
+    const isDraft = c.id === "__draft";
+    const isEditing = isDraft || editing?.id === c.id;
+    if (!isEditing) {
+      head.append(
+        btn("✎", "Edit note", () => {
+          editing = { id: c.id, body: c.body };
+          draft = null;
+          redraw();
+        }),
+        btn("–", "Collapse note", () => {
+          collapsed.add(c.id);
+          redraw();
+        }),
+        btn("✕", "Delete note", () => toApp({ type: "kong-comment-delete", id: c.id })),
+      );
+    }
+    card.append(head);
+    if (isEditing) {
+      const state = isDraft ? draft : editing;
+      const ta = el("textarea");
+      ta.placeholder = "Write a note… (Ctrl+Enter to save)";
+      ta.value = state.body;
+      ta.addEventListener("input", () => (state.body = ta.value));
+      const save = () => {
+        const body = ta.value.trim();
+        if (!body) return;
+        if (isDraft) {
+          toApp({ type: "kong-comment-create", color: draft.color, preview: draft.anchor, body });
+          draft = null;
+        } else {
+          if (body !== c.body) toApp({ type: "kong-comment-edit", id: c.id, body });
+          editing = null;
+        }
+        redraw();
+      };
+      const cancel = () => {
+        if (isDraft) draft = null;
+        else editing = null;
+        redraw();
+      };
+      ta.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && e.ctrlKey) save();
+        if (e.key === "Escape") cancel();
+      });
+      // Tinymist binds space, g/h/j/k/l/t… on window/body and cancels them; keep typing to ourselves.
+      for (const type of ["keydown", "keypress", "keyup"]) ta.addEventListener(type, (e) => e.stopPropagation());
+      const actions = el("div", "kong-note-actions");
+      const ok = btn("Save", "Save note", save);
+      ok.className = "primary";
+      actions.append(btn("Cancel", "Cancel", cancel), ok);
+      card.append(ta, actions);
+      requestAnimationFrame(() => ta.isConnected && ta.focus());
+    } else {
+      const body = el("div", "kong-note-body", c.body);
+      body.title = "Show in editor";
+      body.addEventListener("click", () => toApp({ type: "kong-comment-select", id: c.id }));
+      card.append(body);
+    }
+    return card;
+  }
+
+  function redraw() {
+    const host = scroller();
+    if (!host) return;
+    if (getComputedStyle(host).position === "static") host.style.position = "relative";
+    if (!layer || !layer.isConnected) {
+      layer = el("div", "kong-comments-layer");
+      // Keep Tinymist's drag-to-pan off our notes so their buttons and text boxes work.
+      layer.addEventListener("mousedown", (e) => e.stopPropagation());
+      host.appendChild(layer);
+    }
+    layer.replaceChildren();
+    // Mid re-render the pages can be briefly missing; try again shortly.
+    if ((comments.length || draft) && !document.querySelector(".typst-page-inner")) return scheduleRedraw();
+    const h = host.getBoundingClientRect();
+    const local = (x, y) => [x - h.left + host.scrollLeft, y - h.top + host.scrollTop];
+
+    const items = [];
+    for (const c of comments) {
+      const a = c.preview || (c.quote ? { text: c.quote, page: null, index: 0 } : null); // v1 comments: find by text
+      if (!a) continue;
+      const found = locate(a);
+      items.push({ c, found: !!found, page: found ? found.page : a.page, rects: found ? found.rects : savedRects(a) });
+    }
+    if (draft) {
+      const found = locate(draft.anchor);
+      items.push({ c: { id: "__draft", color: draft.color, body: "" }, found: true, page: draft.anchor.page, rects: found ? found.rects : savedRects(draft.anchor) });
+    }
+
+    const placed = items.filter((it) => it.rects.length);
+    for (const it of placed) {
+      for (const r of it.rects) {
+        const b = el("div", it.found ? "kong-hl" : "kong-hl moved");
+        const [x, y] = local(r.left, r.top);
+        Object.assign(b.style, { left: `${x}px`, top: `${y}px`, width: `${r.width}px`, height: `${r.height}px`, background: COLORS[it.c.color] || COLORS.yellow });
+        layer.appendChild(b);
+      }
+    }
+
+    // Notes sit beside the page when there is room, else inside its right edge; stacked so they don't overlap.
+    placed.sort((a, b) => a.rects[0].top - b.rects[0].top);
+    let bottom = -Infinity;
+    for (const it of placed) {
+      const color = COLORS[it.c.color] || COLORS.yellow;
+      const p = pageBox(it.page) || it.rects[0];
+      const isOpen = it.c.id === "__draft" || editing?.id === it.c.id || !collapsed.has(it.c.id);
+      let node;
+      if (isOpen) {
+        node = noteCard(it, color);
+      } else {
+        node = el("button", "kong-note-tab", "💬");
+        node.type = "button";
+        node.title = it.c.body;
+        node.setAttribute("aria-label", "Open note");
+        node.style.setProperty("--c", color);
+        node.addEventListener("click", () => {
+          collapsed.delete(it.c.id);
+          redraw();
+        });
+      }
+      layer.appendChild(node);
+      const w = node.offsetWidth;
+      const viewRight = Math.min(h.right, innerWidth); // the host can be wider than the window
+      const roomRight = viewRight - p.right >= w + 16;
+      const [px] = local(roomRight ? p.right + 8 : Math.min(p.right, viewRight) - w - 8, 0);
+      const [, ty] = local(0, it.rects[0].top - 4);
+      const top = Math.max(ty, bottom + 6);
+      node.style.left = `${px}px`;
+      node.style.top = `${top}px`;
+      bottom = top + node.offsetHeight;
+    }
+  }
+
+  function drawPalette() {
+    if (!palette) {
+      palette = el("div", "kong-palette");
+      palette.addEventListener("mousedown", (e) => e.stopPropagation());
+      document.body.appendChild(palette);
+    }
+    palette.hidden = !tool.on;
+    palette.replaceChildren(el("span", null, "Select text to highlight"));
+    for (const [key, css] of Object.entries(COLORS)) {
+      const s = el("button", key === tool.color ? "kong-swatch active" : "kong-swatch");
+      s.type = "button";
+      s.title = `${key[0].toUpperCase()}${key.slice(1)} highlight`;
+      s.setAttribute("aria-label", s.title);
+      s.setAttribute("aria-pressed", String(key === tool.color));
+      s.style.background = css;
+      s.addEventListener("click", () => {
+        tool.color = key;
+        toApp({ type: "kong-comment-tool", color: key });
+        if (draft) draft.color = key;
+        drawPalette();
+        redraw();
+      });
+      palette.appendChild(s);
+    }
+  }
+
+  // Highlighter drags are tracked here rather than with the browser's selection: Tinymist's text
+  // layer boxes overlap on lines with mixed styles, so native hit-testing picks the wrong run.
+  // We pick characters by their own on-screen boxes instead.
+  let drag = null; // { page, chars, boxes, a, b } (a/b: indices of the first/last character under the drag)
+
+  function pageAt(x, y) {
+    let best = null;
+    let bestDist = Infinity;
+    for (const r of document.querySelectorAll(".typst-page-inner")) {
+      const b = r.getBoundingClientRect();
+      const d = y < b.top ? b.top - y : y > b.bottom ? y - b.bottom : 0;
+      if (d < bestDist) {
+        bestDist = d;
+        best = Number(r.getAttribute("data-page-number"));
+      }
+    }
+    return best;
+  }
+
+  function charAt(boxes, x, y) {
+    let best = -1;
+    let bestScore = Infinity;
+    for (let i = 0; i < boxes.length; i++) {
+      const b = boxes[i];
+      if (!b.width) continue;
+      const dx = x < b.left ? b.left - x : x > b.right ? x - b.right : 0;
+      const dy = y < b.top ? b.top - y : y > b.bottom ? y - b.bottom : 0;
+      const score = dy * 10 + dx; // stay on the pointer's line first
+      if (score < bestScore) {
+        bestScore = score;
+        best = i;
+      }
+    }
+    return best;
+  }
+
+  function dragRange(d) {
+    const lo = Math.min(d.a, d.b);
+    const hi = Math.max(d.a, d.b);
+    const r = document.createRange();
+    r.setStart(d.chars[lo][0], d.chars[lo][1]);
+    r.setEnd(d.chars[hi][0], d.chars[hi][1] + 1);
+    return { r, lo };
+  }
+
+  function drawDrag() {
+    if (!drag || !layer) return;
+    for (const old of layer.querySelectorAll(".kong-drag")) old.remove();
+    const host = scroller();
+    const h = host.getBoundingClientRect();
+    for (const rc of outerRects(dragRange(drag).r.getClientRects())) {
+      const b = el("div", "kong-hl kong-drag");
+      Object.assign(b.style, {
+        left: `${rc.left - h.left + host.scrollLeft}px`,
+        top: `${rc.top - h.top + host.scrollTop}px`,
+        width: `${rc.width}px`,
+        height: `${rc.height}px`,
+        background: COLORS[tool.color],
+      });
+      layer.appendChild(b);
+    }
+  }
+
+  const ours = (t) => layer?.contains(t) || palette?.contains(t);
+
+  function onToolDown(e) {
+    if (!tool.on || e.button !== 0 || ours(e.target)) return;
+    // Capture phase on window: keeps Tinymist from panning or jumping while highlighting.
+    e.stopPropagation();
+    e.preventDefault();
+    const page = pageAt(e.clientX, e.clientY);
+    if (page == null) return;
+    const { chars } = pageChars(page);
+    const r = document.createRange();
+    const boxes = chars.map(([n, i]) => {
+      r.setStart(n, i);
+      r.setEnd(n, i + 1);
+      return r.getBoundingClientRect();
+    });
+    const a = charAt(boxes, e.clientX, e.clientY);
+    if (a < 0) return;
+    if (!layer) redraw();
+    drag = { page, chars, boxes, a, b: a, moved: false };
+    drawDrag();
+  }
+
+  function onToolMove(e) {
+    if (!drag) return;
+    e.stopPropagation();
+    const b = charAt(drag.boxes, e.clientX, e.clientY);
+    if (b >= 0 && b !== drag.b) {
+      drag.b = b;
+      drag.moved = true;
+      drawDrag();
+    }
+  }
+
+  function onToolUp(e) {
+    if (!drag) return;
+    e.stopPropagation();
+    const d = drag;
+    drag = null;
+    if (!d.moved) {
+      redraw(); // a plain click: nothing to highlight
+      return;
+    }
+    const { r, lo } = dragRange(d);
+    const p = pageBox(d.page);
+    const text = r.toString().trim();
+    if (!strip(text) || !p) return redraw();
+    const round = (v) => Math.round(v * 1e4) / 1e4;
+    const rects = outerRects(r.getClientRects()).map((x) => [(x.left - p.left) / p.width, (x.top - p.top) / p.height, x.width / p.width, x.height / p.height].map(round));
+    draft = { anchor: { page: d.page, text, index: lo, rects }, color: tool.color, body: "" };
+    editing = null;
+    redraw();
+  }
+
+  // Ask Tinymist (over its own websocket, as its click handler does) for the source position of a page point.
+  function sendSrcPoint(page, x, y) {
+    const sock = document.getElementById("typst-container")?.typstWebsocket;
+    const g = document.querySelector(`g.typst-page[data-page-number="${page}"]`);
+    const p = pageBox(page);
+    if (!sock || sock.readyState !== 1 || !g || !p) return false;
+    const w = parseFloat(g.getAttribute("data-page-width"));
+    const ht = parseFloat(g.getAttribute("data-page-height"));
+    sock.send(`src-point ${JSON.stringify({ page_no: page + 1, x: ((x - p.left) / p.width) * w, y: ((y - p.top) / p.height) * ht })}`);
+    return true;
+  }
+
+  window.addEventListener("message", (e) => {
+    if (e.source !== parent || !e.data) return;
+    if (e.data.type === "kong-comments") {
+      comments = e.data.comments || [];
+      tool = e.data.tool || tool;
+      if (!tool.on) draft = null;
+      document.body.classList.toggle("kong-tool-on", !!tool.on);
+      if (editing && !comments.some((c) => c.id === editing.id)) editing = null;
+      drawPalette();
+      redraw();
+    } else if (e.data.type === "kong-src-request") {
+      // The app pairs the next two source positions it receives with this new comment: start, then end.
+      const a = e.data.anchor;
+      const rects = locate(a)?.rects || savedRects(a);
+      const first = rects[0];
+      const last = rects[rects.length - 1];
+      const ok =
+        first &&
+        sendSrcPoint(a.page, first.left + 1, first.top + first.height / 2) &&
+        sendSrcPoint(a.page, last.right - 1, last.top + last.height / 2);
+      if (!ok) toApp({ type: "kong-src-none" });
+    }
+  });
+
+  function startComments() {
+    const style = document.createElement("style");
+    style.textContent = commentCss;
+    document.head.appendChild(style);
+    window.addEventListener("mousedown", onToolDown, true);
+    window.addEventListener("mousemove", onToolMove, true);
+    window.addEventListener("mouseup", onToolUp, true);
+    // While highlighting, a click must not also become a Tinymist jump.
+    window.addEventListener("click", (e) => tool.on && !ours(e.target) && e.stopPropagation(), true);
+    // Re-place everything after Tinymist re-renders or zooms (but not for our own drawing).
+    new MutationObserver((records) => {
+      if (!comments.length && !draft) return;
+      if (records.some((r) => !ours(r.target) && r.target !== layer)) scheduleRedraw();
+    }).observe(document.body, { childList: true, subtree: true, attributes: true });
+    window.addEventListener("resize", scheduleRedraw);
+    // Notes stay inside the visible width, so follow horizontal scrolling.
+    document.addEventListener("scroll", () => (comments.length || draft) && scheduleRedraw(), true);
+    toApp({ type: "kong-preview-ready" });
+  }
+
   function start() {
+    startComments();
     const style = document.createElement("style");
     style.textContent = css;
     document.head.appendChild(style);
